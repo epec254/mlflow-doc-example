@@ -103,6 +103,7 @@ Provide the complete email as JUST a JSON object that can be loaded via `json.lo
 Remember, this email should feel like it was thoughtfully written by the sales representative based on their specific knowledge of the customer, not like an automated message."""
 
 
+@mlflow.trace
 def core_generate_email_logic(
     customer_data: dict, prompt_template: str, model: str = "databricks-claude-sonnet-4"
 ):
