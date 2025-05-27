@@ -25,45 +25,45 @@ This application consists of a FastAPI backend and a React (Vite) frontend to ge
 
 ## Prerequisites
 
-*   Python 3.8+
-*   Node.js 18+ and npm (or yarn)
-*   `uv` (for Python package management and virtual environment)
-*   Databricks CLI configured with credentials that can access the specified model (`agents-demo-gpt4o`) OR `DATABRICKS_HOST` and `DATABRICKS_TOKEN` environment variables set.
-    *   If Databricks SDK cannot be initialized, the backend will use a mock LLM response.
+Refer to [appendix.md](appendix.md) for detailed prerequisites.
 
-## Setup
+*   A `Makefile` in the root directory with the following targets:
+    *   `install`: Installs backend and frontend dependencies.
+    *   `run_backend`: Starts the backend server.
+    *   `run_frontend`: Starts the frontend development server.
+    *   `start`: Starts both backend and frontend servers.
 
-### 1. Backend Setup
+## Setup & Running the Application with Make
 
-Navigate to the `backend` directory:
-```bash
-cd backend
-```
+1.  **Install Dependencies:**
+    Open your terminal in the project root and run:
+    ```bash
+    make install
+    ```
+    This command will set up the necessary environments and install dependencies for both the backend and frontend. For detailed manual setup steps, see [appendix.md](appendix.md).
 
-Create a virtual environment (recommended):
-```bash
-uv venv
-source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-```
+2.  **Run the Application:**
+    To start both the backend and frontend servers, run:
+    ```bash
+    make start
+    ```
+    Alternatively, you can run them separately:
 
-Install Python dependencies:
-```bash
-uv sync # Installs from pyproject.toml 
-```
+    *   **Start the Backend Server:**
+        In a terminal, from the project root:
+        ```bash
+        make run_backend
+        ```
+        The backend server will start on `http://localhost:8000`.
 
-### 2. Frontend Setup
+    *   **Start the Frontend Development Server:**
+        In a new terminal, from the project root:
+        ```bash
+        make run_frontend
+        ```
+        The React development server will start, typically on `http://localhost:5173`.
 
-Navigate to the `frontend` directory (from the project root):
-```bash
-cd frontend
-```
-
-Install Node.js dependencies:
-```bash
-npm install
-# or if you use yarn:
-# yarn install
-```
+For more detailed setup instructions, please refer to the [appendix.md](appendix.md) file.
 
 ## Running the Application
 
