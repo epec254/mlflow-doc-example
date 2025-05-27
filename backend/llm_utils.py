@@ -6,6 +6,9 @@ import mlflow
 
 mlflow.openai.autolog()
 
+# Get model name from environment variable with a default fallback
+LLM_MODEL = os.getenv("LLM_MODEL", "databricks-claude-sonnet-4")
+
 # Attempt to import databricks.sdk and initialize WorkspaceClient
 _WorkspaceClient = None
 _DatabricksError = None
@@ -100,7 +103,9 @@ Provide the complete email as JUST a JSON object that can be loaded via `json.lo
 Remember, this email should feel like it was thoughtfully written by the sales representative based on their specific knowledge of the customer, not like an automated message."""
 
 
-def core_generate_email_logic(customer_data: dict, prompt_template: str):
+def core_generate_email_logic(
+    customer_data: dict, prompt_template: str, model: str = "databricks-claude-sonnet-4"
+):
     if not openai_client:
         raise HTTPException(
             status_code=503,
@@ -109,7 +114,7 @@ def core_generate_email_logic(customer_data: dict, prompt_template: str):
 
     try:
         response = openai_client.chat.completions.create(
-            model="databricks-claude-sonnet-4",  # Model from notebook
+            model=model,  # Use passed model parameter
             messages=[
                 {"role": "system", "content": prompt_template},
                 {"role": "user", "content": json.dumps(customer_data)},

@@ -7,6 +7,9 @@ import os
 # Import from the new llm_utils module
 from llm_utils import core_generate_email_logic, PROMPT_V2, openai_client
 
+# Get model name from environment variable with a default fallback
+LLM_MODEL = os.getenv("LLM_MODEL", "databricks-claude-sonnet-4")
+
 # The following has been moved to backend/llm_utils.py:
 # - Databricks SDK and OpenAI client initialization
 # - PROMPT_V2 definition
@@ -41,8 +44,10 @@ app.add_middleware(
 async def api_generate_email(request_data: EmailRequest):
     customer_data_dict = request_data.customer_info
     try:
-        # Use the imported function and prompt
-        email_json = core_generate_email_logic(customer_data_dict, PROMPT_V2)
+        # Use the imported function and prompt, passing the model from environment
+        email_json = core_generate_email_logic(
+            customer_data_dict, PROMPT_V2, model=LLM_MODEL
+        )
         if (
             not isinstance(email_json, dict)
             or "subject_line" not in email_json
@@ -77,6 +82,7 @@ async def env_check():
         "DATABRICKS_HOST": os.getenv("DATABRICKS_HOST"),
         "MLFLOW_TRACKING_URI": os.getenv("MLFLOW_TRACKING_URI"),
         "MLFLOW_EXPERIMENT_ID": os.getenv("MLFLOW_EXPERIMENT_ID"),
+        "LLM_MODEL": os.getenv("LLM_MODEL"),
         # Don't expose the actual token, just check if it exists
         "DATABRICKS_TOKEN": "***" if os.getenv("DATABRICKS_TOKEN") else None,
     }
