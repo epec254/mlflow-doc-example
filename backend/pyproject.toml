@@ -11,6 +11,8 @@ dependencies = [
     "pydantic",
     "starlette>=0.46.2",
     "click>=8.2.1",
+    "mlflow>=3.0.0rc3",
+    "mlflow-skinny>=3.0.0rc3",
 ]
 
 [build-system]

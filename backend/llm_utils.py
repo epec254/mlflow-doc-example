@@ -2,6 +2,10 @@ import json
 import os
 from fastapi import HTTPException  # For HTTPException used in core_generate_email_logic
 
+import mlflow
+
+mlflow.openai.autolog()
+
 # Attempt to import databricks.sdk and initialize WorkspaceClient
 _WorkspaceClient = None
 _DatabricksError = None
@@ -105,7 +109,7 @@ def core_generate_email_logic(customer_data: dict, prompt_template: str):
 
     try:
         response = openai_client.chat.completions.create(
-            model="agents-demo-gpt4o",  # Model from notebook
+            model="databricks-claude-sonnet-4",  # Model from notebook
             messages=[
                 {"role": "system", "content": prompt_template},
                 {"role": "user", "content": json.dumps(customer_data)},

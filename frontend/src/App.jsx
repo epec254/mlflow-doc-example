@@ -77,6 +77,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [backendStatus, setBackendStatus] = useState("Checking backend...");
+  const [envStatus, setEnvStatus] = useState(null);
 
   useEffect(() => {
     axios.get('/api/health')
@@ -92,6 +93,24 @@ function App() {
         console.error("Health check failed:", err);
         setBackendStatus("Backend not reachable. Please start the backend server.");
       });
+
+    // Check backend environment variables
+    fetch('http://localhost:8000/api/env-check')
+      .then(response => response.json())
+      .then(data => {
+        setEnvStatus(data);
+        console.log('Backend environment variables:', data);
+      })
+      .catch(error => {
+        console.error('Error checking environment variables:', error);
+        setEnvStatus({ error: error.message });
+      });
+
+    // Log frontend environment variables
+    console.log('Frontend environment variables:', {
+      VITE_API_URL: import.meta.env.VITE_API_URL,
+      VITE_APP_ENV: import.meta.env.VITE_APP_ENV,
+    });
   }, []);
 
   const handleGenerateEmail = async () => {
@@ -125,6 +144,17 @@ function App() {
 
   return (
     <div className="App">
+      {envStatus && (
+        <div style={{ 
+          padding: '10px', 
+          margin: '10px', 
+          backgroundColor: envStatus.all_vars_present ? '#e6ffe6' : '#ffe6e6',
+          borderRadius: '4px'
+        }}>
+          <h3>Environment Variables Status</h3>
+          <pre>{JSON.stringify(envStatus, null, 2)}</pre>
+        </div>
+      )}
       <header className="App-header">
         <h1>Personalized Email Generator</h1>
         <p className="backend-status">{backendStatus}</p>

@@ -1,3 +1,7 @@
+# Load environment variables from .env file
+include .env
+export
+
 start:
 	@echo "Starting backend server..."
 	@(cd backend && source .venv/bin/activate && uvicorn main:app --reload --port 8000) &

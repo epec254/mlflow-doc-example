@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import json
+import os
 
 # Import from the new llm_utils module
 from llm_utils import core_generate_email_logic, PROMPT_V2, openai_client
@@ -66,6 +67,23 @@ async def health_check():
         "status": "ok",
         # Use the imported openai_client for the health check
         "openai_client_initialized": openai_client is not None,
+    }
+
+
+@app.get("/api/env-check")
+async def env_check():
+    """Endpoint to verify environment variables are loaded correctly"""
+    env_vars = {
+        "DATABRICKS_HOST": os.getenv("DATABRICKS_HOST"),
+        "MLFLOW_TRACKING_URI": os.getenv("MLFLOW_TRACKING_URI"),
+        "MLFLOW_EXPERIMENT_ID": os.getenv("MLFLOW_EXPERIMENT_ID"),
+        # Don't expose the actual token, just check if it exists
+        "DATABRICKS_TOKEN": "***" if os.getenv("DATABRICKS_TOKEN") else None,
+    }
+    return {
+        "status": "ok",
+        "environment_variables": env_vars,
+        "all_vars_present": all(v is not None for v in env_vars.values()),
     }
 
 
