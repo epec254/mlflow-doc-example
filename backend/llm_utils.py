@@ -1,53 +1,14 @@
 import json
 import os
-from fastapi import HTTPException  # For HTTPException used in core_generate_email_logic
-
 import mlflow
+from databricks.sdk import WorkspaceClient
 
 mlflow.openai.autolog()
 
-# Get model name from environment variable with a default fallback
-LLM_MODEL = os.getenv("LLM_MODEL", "databricks-claude-sonnet-4")
 
-# Attempt to import databricks.sdk and initialize WorkspaceClient
-_WorkspaceClient = None
-_DatabricksError = None
-_sdk_available = False
-try:
-    from databricks.sdk import WorkspaceClient as _ImportedWorkspaceClient
-    from databricks.sdk.errors import DatabricksError as _ImportedDatabricksError
-
-    _WorkspaceClient = _ImportedWorkspaceClient
-    _DatabricksError = _ImportedDatabricksError
-    _sdk_available = True
-    print("Databricks SDK imported successfully.")
-except ImportError:
-    print(
-        "databricks-sdk not found. Please install it: pip install databricks-sdk[openai]"
-    )
-    # _WorkspaceClient, _DatabricksError remain None, _sdk_available remains False
-
-# Initialize OpenAI client (once)
-# This assumes Databricks environment is configured (e.g., DATABRICKS_HOST, DATABRICKS_TOKEN)
-# or databricks-cli is configured.
-openai_client = None  # Initialize to None
-if _sdk_available and _WorkspaceClient and _DatabricksError:
-    try:
-        w = _WorkspaceClient()  # Auto-configures from environment or ~/.databrickscfg
-        openai_client = w.serving_endpoints.get_open_ai_client()
-        print("Successfully initialized Databricks SDK and OpenAI client in llm_utils.")
-    except _DatabricksError as e:
-        print(f"Error initializing Databricks SDK in llm_utils: {e}")
-        print(
-            "Please ensure DATABRICKS_HOST and DATABRICKS_TOKEN are set or databricks-cli is configured."
-        )
-        # openai_client remains None
-    except Exception as e:
-        print(
-            f"An unexpected error occurred during Databricks SDK initialization in llm_utils: {e}"
-        )
-        # openai_client remains None
-# If SDK was not available, openai_client also remains None.
+# Initialize OpenAI client
+w = WorkspaceClient()  # Auto-configures from environment or ~/.databrickscfg
+openai_client = w.serving_endpoints.get_open_ai_client()
 
 PROMPT_V2 = """
 You are an expert sales communication assistant for CloudFlow Inc. Your task is to generate a personalized, professional follow-up email for our sales representatives to send to their customers at the end of the day.
@@ -104,48 +65,26 @@ Remember, this email should feel like it was thoughtfully written by the sales r
 
 
 @mlflow.trace
-def core_generate_email_logic(
-    customer_data: dict, prompt_template: str, model: str = "databricks-claude-sonnet-4"
-):
+def core_generate_email_logic(customer_data: dict, prompt_template: str, model: str):
     if not openai_client:
-        raise HTTPException(
-            status_code=503,
-            detail="OpenAI client not available. Please check backend server logs for Databricks SDK initialization issues.",
-        )
+        raise RuntimeError("OpenAI client not available")
 
-    try:
-        response = openai_client.chat.completions.create(
-            model=model,  # Use passed model parameter
-            messages=[
-                {"role": "system", "content": prompt_template},
-                {"role": "user", "content": json.dumps(customer_data)},
-            ],
-        )
-        s = response.choices[0].message.content
-    except Exception as e:
-        # Catch issues with the actual API call
-        print(f"Error during OpenAI API call: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Error communicating with the LLM: {str(e)}"
-        )
+    response = openai_client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": prompt_template},
+            {"role": "user", "content": json.dumps(customer_data)},
+        ],
+    )
+    s = response.choices[0].message.content
 
-    # Clean JSON (from notebook's generate_email function)
-    # Check if the string starts with ```json and ends with ```
+    # Clean JSON
     clean_string = s
     if s.startswith("```json\\n") and s.endswith("\\n```"):
         clean_string = s[len("```json\\n") : -len("\\n```")]
-    elif s.startswith("```") and s.endswith("```"):  # More general ``` wrapper
+    elif s.startswith("```") and s.endswith("```"):
         clean_string = s[3:-3]
 
-    # Further clean potential leading/trailing newlines or spaces if any
     clean_string = clean_string.strip()
-
-    try:
-        email_json = json.loads(clean_string)
-    except json.JSONDecodeError as e:
-        error_detail = f"Failed to parse LLM output as JSON. Error: {e}. Raw output received: '{s[:500]}...'"  # Log snippet of raw output
-        print(error_detail)
-        print(f"Full problematic string for decode error: '{clean_string}'")
-        raise HTTPException(status_code=500, detail=error_detail)
-
+    email_json = json.loads(clean_string)
     return email_json

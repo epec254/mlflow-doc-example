@@ -8,7 +8,10 @@ import os
 from llm_utils import core_generate_email_logic, PROMPT_V2, openai_client
 
 # Get model name from environment variable with a default fallback
-LLM_MODEL = os.getenv("LLM_MODEL", "databricks-claude-sonnet-4")
+LLM_MODEL = os.getenv("LLM_MODEL")
+
+if not LLM_MODEL:
+    raise ValueError("LLM_MODEL environment variable is not set")
 
 # The following has been moved to backend/llm_utils.py:
 # - Databricks SDK and OpenAI client initialization
@@ -44,7 +47,6 @@ app.add_middleware(
 async def api_generate_email(request_data: EmailRequest):
     customer_data_dict = request_data.customer_info
     try:
-        # Use the imported function and prompt, passing the model from environment
         email_json = core_generate_email_logic(
             customer_data_dict, PROMPT_V2, model=LLM_MODEL
         )
@@ -53,17 +55,19 @@ async def api_generate_email(request_data: EmailRequest):
             or "subject_line" not in email_json
             or "body" not in email_json
         ):
-            malformed_detail = f"LLM output parsed but is not in the expected format (missing 'subject_line' or 'body'). Received: {email_json}"
-            print(malformed_detail)
-            raise HTTPException(status_code=500, detail=malformed_detail)
+            raise ValueError(
+                "LLM output is not in the expected format (missing 'subject_line' or 'body')"
+            )
         return EmailOutput(**email_json)
-    except HTTPException:
-        raise  # Re-throw HTTPException from core_generate_email_logic or this handler
     except Exception as e:
-        print(f"Unexpected error in api_generate_email: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"An unexpected error occurred: {str(e)}"
-        )
+        error_msg = str(e)
+        if "OpenAI client not available" in error_msg:
+            status_code = 503
+        elif "Failed to parse LLM output" in error_msg:
+            status_code = 500
+        else:
+            status_code = 500
+        raise HTTPException(status_code=status_code, detail=error_msg)
 
 
 @app.get("/api/health")

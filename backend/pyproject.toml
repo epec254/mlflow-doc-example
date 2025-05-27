@@ -8,11 +8,12 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "databricks-sdk[openai]",
-    "pydantic",
+    "pydantic>=2",
     "starlette>=0.46.2",
     "click>=8.2.1",
-    "mlflow>=3.0.0rc3",
-    "mlflow-skinny>=3.0.0rc3",
+    "mlflow",
+    "mlflow-skinny",
+    "databricks-agents",
 ]
 
 [build-system]
@@ -21,3 +22,8 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 py-modules = ["main"]
+
+[tool.uv.sources]
+mlflow = { git = "https://github.com/mlflow/mlflow.git", rev = "master" }
+mlflow-skinny = { git = "https://github.com/mlflow/mlflow.git", subdirectory = "skinny", rev = "master" }
+databricks-agents = { url = "https://ml-team-public-read.s3.us-west-2.amazonaws.com/wheels/rag-studio/dev/samraj.moorjani/databricks_agents-1.0.0rc1.dev0-py3-none-any.whl" }
