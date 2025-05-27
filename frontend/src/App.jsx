@@ -155,6 +155,27 @@ function App() {
           <pre>{JSON.stringify(envStatus, null, 2)}</pre>
         </div>
       )}
+      <div style={{ 
+        padding: '10px', 
+        margin: '10px', 
+        backgroundColor: '#e6f3ff',
+        borderRadius: '4px'
+      }}>
+        <h3>MLflow Tracing</h3>
+        <button 
+          onClick={() => window.open(`${import.meta.env.VITE_DATABRICKS_HOST}/ml/experiments/${import.meta.env.VITE_MLFLOW_EXPERIMENT_ID}/traces`, '_blank')}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#0066cc',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          View MLflow Tracing
+        </button>
+      </div>
       <header className="App-header">
         <h1>Personalized Email Generator</h1>
         <p className="backend-status">{backendStatus}</p>
