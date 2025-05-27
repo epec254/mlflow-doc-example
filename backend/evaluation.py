@@ -2,6 +2,7 @@ import json
 import mlflow
 from dotenv import load_dotenv
 import os
+import functools
 from mlflow.genai import scorers
 from mlflow.genai.scorers import scorer
 from databricks.agents.evals import judges
@@ -109,73 +110,26 @@ def rep_name_in_email(inputs, outputs):
     return inputs["customer_info"]["sales_rep"]["name"] in outputs["body"]
 
 
-prompt = """You are an expert sales communication assistant for CloudFlow Inc. Your task is to generate a personalized, professional follow-up email for our sales representatives to send to their customers at the end of the day.
-
-## INPUT DATA
-You will be provided with a JSON object containing:
-- Account information
-- Recent activity data (meetings, product usage, support tickets)
-- Sales representative details
-
-## EMAIL REQUIREMENTS
-Generate an email that follows these guidelines:
-
-1. SUBJECT LINE:
-   - Engaging and attention-grabbing
-   - Include the company name if appropriate
-
-2. GREETING:
-   - Address the main contact by first name
-   - Use a professional but friendly opening
-
-3. BODY CONTENT:
-   - Begin with a brief mention of CloudFlow's recent improvements
-   - Reference the most recent meeting/interaction
-   - Provide updates on support tickets
-   - Highlight positive product usage trends
-   - Address any action items from previous meetings
-   - Include recommendations for additional features they should try
-   - Suggest scheduling a follow-up meeting soon
-
-4. TONE AND STYLE:
-   - Professional but enthusiastic
-   - Show expertise by using industry terminology
-   - Include at least one customer success story
-   - Balance being informative with driving future business
-   - Personalized where possible
-   - Ensure email is comprehensive enough to cover all important points
-
-5. CLOSING:
-   - Include an appropriate sign-off
-   - Use the sales rep's signature from the provided data
-   - Add a brief mention of an upcoming product release or feature
-
-## OUTPUT FORMAT
-Provide the complete email as JUST a JSON object that can be loaded via `json.loads()` (do not wrap the JSON in backticks) with:
-- `subject_line`: Subject line
-- `body`: Body content with appropriate spacing and formatting including the signature
-
-Remember, this email should position the sales representative as a trusted advisor who can help the customer get maximum value from CloudFlow's solutions."""
-
-
-def predict_fn(customer_info):
+def predict_fn(customer_info, prompt_template, model):
     """
     Prediction function that uses core_generate_email_logic to generate emails.
 
     Args:
         input_data: Dictionary containing customer information
+        prompt_template: The prompt template to use for generation
+        model: The model to use for generation
 
     Returns:
         Dictionary containing generated email subject and body
     """
     return core_generate_email_logic(
         customer_data=customer_info,
-        prompt_template=prompt,
-        model="databricks-claude-3-7-sonnet",
+        prompt_template=prompt_template,
+        model=model,
     )
 
 
-def evaluate_email_generation(data):
+def evaluate_email_generation(prompt, model):
     """
     Evaluate email generation using MLflow's evaluation harness.
 
@@ -185,17 +139,132 @@ def evaluate_email_generation(data):
     Returns:
         Evaluation results from MLflow
     """
+    # Create a partial function with prompt_template and model pre-filled
+    partial_predict_fn = functools.partial(
+        predict_fn, prompt_template=prompt, model=model
+    )
+
+    # Load evaluation data
+    data = load_input_data("../input_data.jsonl")
+
+    # Run evaluation
     return _evaluate(
         data=data[:5],
-        predict_fn=predict_fn,
+        predict_fn=partial_predict_fn,
         scorers=[scorers.safety, email_guidelines, grounded, rep_name_in_email],
     )
 
 
-def main():
-    data = load_input_data("../input_data.jsonl")
-    results = evaluate_email_generation(data)
+def eval_v1():
+
+    prompt = """You are an expert sales communication assistant for CloudFlow Inc. Your task is to generate a personalized, professional follow-up email for our sales representatives to send to their customers at the end of the day.
+
+    ## INPUT DATA
+    You will be provided with a JSON object containing:
+    - Account information
+    - Recent activity data (meetings, product usage, support tickets)
+    - Sales representative details
+
+    ## EMAIL REQUIREMENTS
+    Generate an email that follows these guidelines:
+
+    1. SUBJECT LINE:
+    - Engaging and attention-grabbing
+    - Include the company name if appropriate
+
+    2. GREETING:
+    - Address the main contact by first name
+    - Use a professional but friendly opening
+
+    3. BODY CONTENT:
+    - Begin with a brief mention of CloudFlow's recent improvements
+    - Reference the most recent meeting/interaction
+    - Provide updates on support tickets
+    - Highlight positive product usage trends
+    - Address any action items from previous meetings
+    - Include recommendations for additional features they should try
+    - Suggest scheduling a follow-up meeting soon
+
+    4. TONE AND STYLE:
+    - Professional but enthusiastic
+    - Show expertise by using industry terminology
+    - Include at least one customer success story
+    - Balance being informative with driving future business
+    - Personalized where possible
+    - Ensure email is comprehensive enough to cover all important points
+
+    5. CLOSING:
+    - Include an appropriate sign-off
+    - Use the sales rep's signature from the provided data
+    - Add a brief mention of an upcoming product release or feature
+
+    ## OUTPUT FORMAT
+    Provide the complete email as JUST a JSON object that can be loaded via `json.loads()` (do not wrap the JSON in backticks) with:
+    - `subject_line`: Subject line
+    - `body`: Body content with appropriate spacing and formatting including the signature
+
+    Remember, this email should position the sales representative as a trusted advisor who can help the customer get maximum value from CloudFlow's solutions."""
+
+    evaluate_email_generation(prompt=prompt, model="databricks-claude-3-7-sonnet")
+
+
+def eval_v2():
+    prompt = """
+    You are an expert sales communication assistant for CloudFlow Inc. Your task is to generate a personalized, professional follow-up email for our sales representatives to send to their customers at the end of the day.
+
+    ## INPUT DATA
+    You will be provided with a JSON object containing:
+    - Account information
+    - Recent activity data (meetings, product usage, support tickets)
+    - Sales representative details
+
+    ## EMAIL REQUIREMENTS
+    Generate an email that follows these guidelines:
+
+    1. SUBJECT LINE:
+    - Concise and specific to the most important update or follow-up point
+    - Include the company name if appropriate
+
+    2. GREETING:
+    - Address the main contact by first name
+    - Use a professional but friendly opening
+
+    3. BODY CONTENT (prioritize in this order):
+    - Reference the most recent meeting/interaction and acknowledge key points discussed
+    - Discuss any pressing issues that are still open immediatly afterwards
+    - Provide updates on any urgent or recently resolved support tickets
+    - Highlight positive product usage trends or achievements
+    - Address any specific action items from previous meetings
+    - Include personalized recommendations based on features listed as 'least_used_features' and directly related to the 'potential_opportunity' field.
+        - Make sure these recommendations can NOT be copied to another customer in a different situation
+        - No more than ONE feature recommendation for accounts with open critical issues
+    - Suggest clear and specific next steps
+        - Only request a meeting if it can be tied to specific action items
+
+
+    4. TONE AND STYLE:
+    - Professional but conversational
+    - Concise paragraphs (2-3 sentences each)
+    - Use bullet points for lists or multiple items
+    - Balance between being informative and actionable
+    - Personalized to reflect the existing relationship
+    - Adjust formality based on the customer's industry and relationship history
+
+    5. CLOSING:
+    - Include an appropriate sign-off
+    - Use the sales rep's signature from the provided data
+    - No generic marketing language or overly sales-focused calls to action
+
+    ## OUTPUT FORMAT
+    Provide the complete email as JUST a JSON object that can be loaded via `json.loads()` (do not wrap the JSON in backticks) with:
+    - `subject_line`: Subject line
+    - `body`: Body content with appropriate spacing and formatting including the signature
+
+    Remember, this email should feel like it was thoughtfully written by the sales representative based on their specific knowledge of the customer, not like an automated message."""
+
+    evaluate_email_generation(prompt=prompt, model="databricks-claude-3-7-sonnet")
 
 
 if __name__ == "__main__":
-    main()
+    eval_v1()
+    eval_v2()
