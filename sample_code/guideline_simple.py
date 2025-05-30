@@ -21,7 +21,7 @@ client = OpenAI(
 tone = "The response must maintain a courteous, respectful tone throughout.  It must show empathy for customer concerns."
 structure = "The response must use clear, concise language and structures responses logically.  It must avoids jargon or explains technical terms when used."
 banned_topics = "If the request is a question about product pricing, the response must politely decline to answer and refer the user to the pricing page."
-relevance = "The response must be relevant to the user's request.  If the request is not clear, the response must ask for more information."
+relevance = "The response must be relevant to the user's request.  Only consider the relevance and nothing else. If the request is not clear, the response must ask for more information."
 
 # This is a global variable that will be used to toggle the behavior of the customer support agent to see how the guidelines scorers handle rude and verbose responses
 BE_RUDE_AND_VERBOSE = False
@@ -59,6 +59,16 @@ eval_dataset = [
         "inputs": {
             "messages": [
                 {"role": "user", "content": "How much does a microwave cost?"},
+            ]
+        },
+    },
+    {
+        "inputs": {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Can I return the microwave I bought 2 months ago?",
+                },
             ]
         },
     },
