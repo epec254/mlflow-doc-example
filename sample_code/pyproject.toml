@@ -1,0 +1,18 @@
+[project]
+name = "sample-code"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "databricks-agents",
+    "mlflow",
+    "mlflow-skinny",
+    "openai>=1.82.0",
+    "python-dotenv>=1.1.0",
+]
+
+[tool.uv.sources]
+databricks-agents = { url = "https://ml-team-public-read.s3.us-west-2.amazonaws.com/wheels/rag-studio/dev/samraj.moorjani/databricks_agents-1.0.0rc2.dev0-py3-none-any.whl" }
+mlflow = { git = "https://github.com/mlflow/mlflow.git", rev = "master" }
+mlflow-skinny = { git = "https://github.com/mlflow/mlflow.git", subdirectory = "skinny", rev = "master" }
