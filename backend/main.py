@@ -1,14 +1,21 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, AsyncGenerator
 from enum import Enum
 import json
 import os
 import mlflow
+import asyncio
 
 # Import from the new llm_utils module
-from llm_utils import core_generate_email_logic, PROMPT_V2, openai_client
+from llm_utils import (
+    core_generate_email_logic,
+    PROMPT_V2,
+    openai_client,
+    stream_generate_email_logic,
+)
 
 # Get model name from environment variable with a default fallback
 LLM_MODEL = os.getenv("LLM_MODEL")
@@ -110,6 +117,44 @@ async def api_generate_email(request_data: EmailRequest):
         else:
             status_code = 500
         raise HTTPException(status_code=status_code, detail=error_msg)
+
+
+@app.post("/api/generate-email-stream/")
+async def api_generate_email_stream(request_data: EmailRequest):
+    """Stream email generation token by token using Server-Sent Events"""
+    customer_data_dict = request_data.customer_info
+
+    async def generate():
+        try:
+            # Stream tokens from the LLM
+            async for chunk in stream_generate_email_logic(
+                customer_data_dict, PROMPT_V2, model=LLM_MODEL
+            ):
+                # Format as Server-Sent Event
+                if chunk["type"] == "token":
+                    yield f"data: {json.dumps({'type': 'token', 'content': chunk['content']})}\n\n"
+                elif chunk["type"] == "done":
+                    yield f"data: {json.dumps({'type': 'done', 'trace_id': chunk['trace_id']})}\n\n"
+                elif chunk["type"] == "error":
+                    yield f"data: {json.dumps({'type': 'error', 'error': chunk['error']})}\n\n"
+
+                # Small delay to ensure smooth streaming
+                await asyncio.sleep(0.01)
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+        finally:
+            # Send done event to close the stream
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable Nginx buffering
+        },
+    )
 
 
 @app.get("/api/health")

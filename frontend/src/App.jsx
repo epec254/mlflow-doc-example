@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import './App.css';
 
@@ -20,6 +20,11 @@ function App() {
   const [feedbackComment, setFeedbackComment] = useState('');
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [currentTraceId, setCurrentTraceId] = useState(null); // Store trace_id
+  // Streaming state
+  const [useStreaming, setUseStreaming] = useState(true); // Toggle for streaming
+  const [streamingContent, setStreamingContent] = useState(''); // Raw streaming content
+  const [isStreaming, setIsStreaming] = useState(false); // Streaming in progress
+  const [streamingEmail, setStreamingEmail] = useState({ subject_line: '', body: '' }); // Parsed streaming email
 
   useEffect(() => {
     // Check backend health
@@ -125,6 +130,15 @@ function App() {
       return;
     }
 
+    // Decide whether to use streaming or regular generation
+    if (useStreaming) {
+      await handleGenerateEmailStream();
+    } else {
+      await handleGenerateEmailRegular();
+    }
+  };
+
+  const handleGenerateEmailRegular = async () => {
     setLoading(true);
     setError(null);
     setGeneratedEmail(null);
@@ -158,6 +172,156 @@ function App() {
       }
     }
     setLoading(false);
+  };
+
+  const handleGenerateEmailStream = async () => {
+    setLoading(true);
+    setIsStreaming(true);
+    setError(null);
+    setGeneratedEmail(null);
+    setStreamingContent('');
+    setStreamingEmail({ subject_line: '', body: '' });
+    // Reset feedback when generating new email
+    setFeedbackRating(null);
+    setFeedbackComment('');
+    setFeedbackSubmitted(false);
+    setCurrentTraceId(null);
+    
+    // Use a local variable to accumulate content
+    let accumulatedContent = '';
+    
+    try {
+      // Add user instructions to the customer data
+      const requestData = {
+        ...customerData,
+        user_instructions_for_email: userInstructions
+      };
+
+      const response = await fetch('http://localhost:8000/api/generate-email-stream/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ customer_info: requestData }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.type === 'token') {
+                accumulatedContent += data.content;
+                setStreamingContent(accumulatedContent);
+                
+                // Try to parse partial JSON to extract subject and body
+                parsePartialEmail(accumulatedContent);
+              } else if (data.type === 'done') {
+                if (data.trace_id) {
+                  setCurrentTraceId(data.trace_id);
+                }
+                // Parse the final content to extract subject and body
+                try {
+                  let cleanContent = accumulatedContent;
+                  
+                  // Clean JSON if wrapped in backticks
+                  if (accumulatedContent.startsWith('```json\n') && accumulatedContent.endsWith('\n```')) {
+                    cleanContent = accumulatedContent.slice(8, -4);
+                  } else if (accumulatedContent.startsWith('```') && accumulatedContent.endsWith('```')) {
+                    cleanContent = accumulatedContent.slice(3, -3);
+                  }
+                  
+                  const emailData = JSON.parse(cleanContent.trim());
+                  setGeneratedEmail(emailData);
+                  // Don't clear streaming content immediately - let the UI transition smoothly
+                  // setStreamingContent(''); // Clear streaming content after successful parse
+                  // setStreamingEmail({ subject_line: '', body: '' }); // Clear streaming email
+                } catch (parseErr) {
+                  console.error('Failed to parse streamed email:', parseErr);
+                  // Fallback: show raw content
+                  setGeneratedEmail({
+                    subject_line: streamingEmail.subject_line || 'Generated Email',
+                    body: streamingEmail.body || accumulatedContent
+                  });
+                }
+              } else if (data.type === 'error') {
+                setError(`Streaming error: ${data.error}`);
+              }
+            } catch (e) {
+              console.error('Failed to parse SSE data:', e);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error generating email stream:", err);
+      setError(`Failed to generate email stream: ${err.message}`);
+    } finally {
+      setLoading(false);
+      setIsStreaming(false);
+      // Clear streaming content after a small delay to prevent flash
+      setTimeout(() => {
+        setStreamingContent('');
+        setStreamingEmail({ subject_line: '', body: '' });
+      }, 100);
+    }
+  };
+
+  const parsePartialEmail = (content) => {
+    try {
+      // Remove potential JSON markdown wrappers
+      let cleanContent = content;
+      if (content.startsWith('```json\n')) {
+        cleanContent = content.slice(8);
+      } else if (content.startsWith('```')) {
+        cleanContent = content.slice(3);
+      }
+      
+      // Try to extract subject_line
+      const subjectMatch = cleanContent.match(/"subject_line"\s*:\s*"([^"]*?)"/);
+      if (subjectMatch) {
+        setStreamingEmail(prev => ({ ...prev, subject_line: subjectMatch[1] }));
+      }
+      
+      // Try to extract body content
+      const bodyMatch = cleanContent.match(/"body"\s*:\s*"([^]*?)(?=",|\s*})/);
+      if (bodyMatch) {
+        // Unescape the JSON string content
+        let bodyContent = bodyMatch[1];
+        bodyContent = bodyContent.replace(/\\n/g, '\n');
+        bodyContent = bodyContent.replace(/\\"/g, '"');
+        bodyContent = bodyContent.replace(/\\\\/g, '\\');
+        setStreamingEmail(prev => ({ ...prev, body: bodyContent }));
+      } else {
+        // If we can't find a complete body, try to get partial body content
+        const partialBodyMatch = cleanContent.match(/"body"\s*:\s*"([^]*)/);
+        if (partialBodyMatch) {
+          let bodyContent = partialBodyMatch[1];
+          bodyContent = bodyContent.replace(/\\n/g, '\n');
+          bodyContent = bodyContent.replace(/\\"/g, '"');
+          bodyContent = bodyContent.replace(/\\\\/g, '\\');
+          setStreamingEmail(prev => ({ ...prev, body: bodyContent }));
+        }
+      }
+    } catch (e) {
+      // Silently fail - this is expected for partial JSON
+    }
   };
 
   const handleFeedbackRating = (rating) => {
@@ -281,12 +445,23 @@ function App() {
               {/* Generate Email Button */}
               {customerData && (
                 <div className="generate-button-section">
+                  <div className="streaming-toggle">
+                    <label className="toggle-label">
+                      <input
+                        type="checkbox"
+                        checked={useStreaming}
+                        onChange={(e) => setUseStreaming(e.target.checked)}
+                        disabled={loading || isStreaming}
+                      />
+                      <span>Enable streaming mode</span>
+                    </label>
+                  </div>
                   <button 
                     onClick={handleGenerateEmail} 
-                    disabled={loading}
+                    disabled={loading || isStreaming}
                     className="generate-button"
                   >
-                    {loading ? 'Generating 🚀' : 'Generate Email 👉'}
+                    {loading || isStreaming ? 'Generating 🚀' : 'Generate Email 👉'}
                   </button>
                 </div>
               )}
@@ -538,15 +713,27 @@ function App() {
             <div className="output-section">
               <h2>Generated Email</h2>
               
-              {!generatedEmail && !loading && (
+              {!generatedEmail && !loading && !isStreaming && !streamingContent && !streamingEmail.subject_line && !streamingEmail.body && (
                 <div className="empty-state">
                   <p>Select a company and click "Generate Email" to see the personalized email here.</p>
                 </div>
               )}
               
-              {loading && (
+              {(loading || isStreaming || (streamingEmail.subject_line || streamingEmail.body)) && !generatedEmail && (
                 <div className="loading-state">
-                  <p>Generating personalized email...</p>
+                  {(loading || isStreaming) && <p>Generating personalized email...</p>}
+                  {(streamingEmail.subject_line || streamingEmail.body) && (
+                    <div className="streaming-preview">
+                      {streamingEmail.subject_line && (
+                        <div className="streaming-subject">
+                          <h3>Subject: {streamingEmail.subject_line}</h3>
+                        </div>
+                      )}
+                      {streamingEmail.body && (
+                        <pre className="email-body streaming">{streamingEmail.body}</pre>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               
@@ -557,7 +744,7 @@ function App() {
                 </div>
               )}
 
-              {generatedEmail && !loading && (
+              {generatedEmail && !loading && !isStreaming && (
                 <div className="email-output">
                   {/* Feedback Widget */}
                   <div className="feedback-widget">
