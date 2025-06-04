@@ -99,7 +99,57 @@ def core_generate_email_logic(customer_data: dict, prompt_template: str, model: 
     return email_json
 
 
-@mlflow.trace
+def stream_output_reducer(chunks):
+    """
+    Aggregate streamed chunks into a final email JSON output.
+
+    This function processes the list of yielded chunks from the streaming generator
+    and returns a consolidated email JSON object with trace_id.
+    """
+    # Initialize variables
+    full_content = ""
+    trace_id = None
+    error = None
+
+    # Process each chunk
+    for chunk in chunks:
+        if isinstance(chunk, dict):
+            if chunk.get("type") == "token":
+                full_content += chunk.get("content", "")
+            elif chunk.get("type") == "done":
+                trace_id = chunk.get("trace_id")
+            elif chunk.get("type") == "error":
+                error = chunk.get("error")
+
+    # If there was an error, return it
+    if error:
+        return {"error": error}
+
+    # Try to parse the accumulated content as JSON
+    try:
+        # Clean JSON
+        clean_string = full_content
+        if full_content.startswith("```json\n") and full_content.endswith("\n```"):
+            clean_string = full_content[len("```json\n") : -len("\n```")]
+        elif full_content.startswith("```") and full_content.endswith("```"):
+            clean_string = full_content[3:-3]
+
+        clean_string = clean_string.strip()
+        email_json = json.loads(clean_string)
+
+        # Add trace_id to the response
+        email_json["trace_id"] = trace_id
+
+        return email_json
+    except json.JSONDecodeError as e:
+        return {
+            "error": f"Failed to parse email JSON: {str(e)}",
+            "raw_content": full_content,
+            "trace_id": trace_id,
+        }
+
+
+@mlflow.trace(output_reducer=stream_output_reducer)
 async def stream_generate_email_logic(
     customer_data: dict, prompt_template: str, model: str
 ):
