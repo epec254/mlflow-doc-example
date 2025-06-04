@@ -87,4 +87,12 @@ def core_generate_email_logic(customer_data: dict, prompt_template: str, model: 
 
     clean_string = clean_string.strip()
     email_json = json.loads(clean_string)
+
+    # Get the current trace_id from MLflow
+    active_span = mlflow.get_current_active_span()
+    trace_id = active_span.trace_id if active_span else None
+
+    # Add trace_id to the response
+    email_json["trace_id"] = trace_id
+
     return email_json

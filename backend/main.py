@@ -1,8 +1,11 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
+from enum import Enum
 import json
 import os
+import mlflow
 
 # Import from the new llm_utils module
 from llm_utils import core_generate_email_logic, PROMPT_V2, openai_client
@@ -47,6 +50,24 @@ class EmailRequest(BaseModel):
 class EmailOutput(BaseModel):
     subject_line: str
     body: str
+    trace_id: Optional[str] = None
+
+
+class FeedbackRating(str, Enum):
+    THUMBS_UP = "up"
+    THUMBS_DOWN = "down"
+
+
+class FeedbackRequest(BaseModel):
+    trace_id: str
+    rating: FeedbackRating
+    comment: Optional[str] = None
+    sales_rep_name: Optional[str] = None
+
+
+class FeedbackResponse(BaseModel):
+    success: bool
+    message: str
 
 
 app = FastAPI()
@@ -132,6 +153,32 @@ async def get_customer_by_name(company_name: str):
         if customer["account"]["name"] == company_name:
             return customer
     raise HTTPException(status_code=404, detail=f"Company '{company_name}' not found")
+
+
+@app.post("/api/feedback", response_model=FeedbackResponse)
+async def submit_feedback(feedback: FeedbackRequest):
+    """
+    Submit user feedback linked to trace
+    """
+    try:
+        # Log feedback using mlflow.log_feedback (MLflow 3 API)
+        mlflow.log_feedback(
+            trace_id=feedback.trace_id,
+            name="user_feedback",
+            value=True if feedback.rating == FeedbackRating.THUMBS_UP else False,
+            rationale=feedback.comment if feedback.comment else None,
+            source=mlflow.entities.AssessmentSource(
+                source_type="HUMAN",
+                source_id=feedback.sales_rep_name or "user",
+            ),
+        )
+
+        return FeedbackResponse(success=True, message="Feedback submitted successfully")
+
+    except Exception as e:
+        return FeedbackResponse(
+            success=False, message=f"Error submitting feedback: {str(e)}"
+        )
 
 
 if __name__ == "__main__":

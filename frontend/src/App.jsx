@@ -19,6 +19,7 @@ function App() {
   const [feedbackRating, setFeedbackRating] = useState(null); // 'up' or 'down'
   const [feedbackComment, setFeedbackComment] = useState('');
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [currentTraceId, setCurrentTraceId] = useState(null); // Store trace_id
 
   useEffect(() => {
     // Check backend health
@@ -131,6 +132,7 @@ function App() {
     setFeedbackRating(null);
     setFeedbackComment('');
     setFeedbackSubmitted(false);
+    setCurrentTraceId(null);
     
     try {
       // Add user instructions to the customer data
@@ -143,6 +145,10 @@ function App() {
         customer_info: requestData
       });
       setGeneratedEmail(response.data);
+      // Store the trace_id from the response
+      if (response.data.trace_id) {
+        setCurrentTraceId(response.data.trace_id);
+      }
     } catch (err) {
       console.error("Error generating email:", err);
       if (err.response && err.response.data && err.response.data.detail) {
@@ -159,18 +165,28 @@ function App() {
     setFeedbackSubmitted(false);
   };
 
-  const handleFeedbackSubmit = () => {
-    if (feedbackRating) {
-      // Here you could send feedback to backend
-      console.log('Feedback submitted:', {
-        rating: feedbackRating,
-        comment: feedbackComment,
-        email: generatedEmail
-      });
+  const handleFeedbackSubmit = async () => {
+    if (feedbackRating && currentTraceId) {
       setFeedbackSubmitted(true);
       
-      // You could add an API call here to save feedback
-      // axios.post('/api/feedback', { rating: feedbackRating, comment: feedbackComment, email_id: generatedEmail.id })
+      try {
+        const response = await axios.post('/api/feedback', {
+          trace_id: currentTraceId,
+          rating: feedbackRating,
+          comment: feedbackComment,
+          sales_rep_name: customerData?.sales_rep?.name || 'user'
+        });
+        
+        if (response.data.success) {
+          console.log('Feedback submitted successfully:', response.data.message);
+        } else {
+          console.error('Feedback submission failed:', response.data.message);
+          setFeedbackSubmitted(false);
+        }
+      } catch (err) {
+        console.error('Error submitting feedback:', err);
+        setFeedbackSubmitted(false);
+      }
     }
   };
 
@@ -577,7 +593,7 @@ function App() {
                       <button 
                         className="feedback-submit-btn"
                         onClick={handleFeedbackSubmit}
-                        disabled={feedbackSubmitted || !feedbackRating}
+                        disabled={feedbackSubmitted || !feedbackRating || !currentTraceId}
                       >
                         {feedbackSubmitted ? '✓ Thank you!' : 'Submit Feedback'}
                       </button>
