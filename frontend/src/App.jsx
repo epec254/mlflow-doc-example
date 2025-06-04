@@ -21,7 +21,6 @@ function App() {
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [currentTraceId, setCurrentTraceId] = useState(null); // Store trace_id
   // Streaming state
-  const [useStreaming, setUseStreaming] = useState(true); // Toggle for streaming
   const [streamingContent, setStreamingContent] = useState(''); // Raw streaming content
   const [isStreaming, setIsStreaming] = useState(false); // Streaming in progress
   const [streamingEmail, setStreamingEmail] = useState({ subject_line: '', body: '' }); // Parsed streaming email
@@ -130,48 +129,8 @@ function App() {
       return;
     }
 
-    // Decide whether to use streaming or regular generation
-    if (useStreaming) {
-      await handleGenerateEmailStream();
-    } else {
-      await handleGenerateEmailRegular();
-    }
-  };
-
-  const handleGenerateEmailRegular = async () => {
-    setLoading(true);
-    setError(null);
-    setGeneratedEmail(null);
-    // Reset feedback when generating new email
-    setFeedbackRating(null);
-    setFeedbackComment('');
-    setFeedbackSubmitted(false);
-    setCurrentTraceId(null);
-    
-    try {
-      // Add user instructions to the customer data
-      const requestData = {
-        ...customerData,
-        user_instructions_for_email: userInstructions
-      };
-
-      const response = await axios.post('/api/generate-email/', { 
-        customer_info: requestData
-      });
-      setGeneratedEmail(response.data);
-      // Store the trace_id from the response
-      if (response.data.trace_id) {
-        setCurrentTraceId(response.data.trace_id);
-      }
-    } catch (err) {
-      console.error("Error generating email:", err);
-      if (err.response && err.response.data && err.response.data.detail) {
-        setError(`Error from backend: ${err.response.data.detail}`);
-      } else {
-        setError("Failed to generate email. Check the console for more details.");
-      }
-    }
-    setLoading(false);
+    // Always use streaming
+    await handleGenerateEmailStream();
   };
 
   const handleGenerateEmailStream = async () => {
@@ -445,17 +404,6 @@ function App() {
               {/* Generate Email Button */}
               {customerData && (
                 <div className="generate-button-section">
-                  <div className="streaming-toggle">
-                    <label className="toggle-label">
-                      <input
-                        type="checkbox"
-                        checked={useStreaming}
-                        onChange={(e) => setUseStreaming(e.target.checked)}
-                        disabled={loading || isStreaming}
-                      />
-                      <span>Enable streaming mode</span>
-                    </label>
-                  </div>
                   <button 
                     onClick={handleGenerateEmail} 
                     disabled={loading || isStreaming}
