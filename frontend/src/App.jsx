@@ -152,8 +152,9 @@ function App() {
     try {
       // Add user instructions to the customer data
       const requestData = {
+        user_input: userInstructions,
         ...customerData,
-        user_instructions_for_email: userInstructions
+        
       };
 
       const response = await fetch('http://localhost:8000/api/generate-email-stream/', {
