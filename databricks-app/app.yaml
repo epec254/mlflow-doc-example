@@ -1,0 +1,4 @@
+command: [
+  "uvicorn",
+  "app:app"
+]
