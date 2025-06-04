@@ -5,6 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "aiohttp>=3.12.9",
+    "asyncio>=3.4.3",
     "databricks-agents",
     "mlflow",
     "mlflow-skinny",
@@ -14,6 +16,6 @@ dependencies = [
 ]
 
 [tool.uv.sources]
+databricks-agents = { url = "https://ml-team-public-read.s3.us-west-2.amazonaws.com/wheels/databricks-agents/staging/databricks_agents-1.0.0rc3-py3-none-any.whl" }
 mlflow = { git = "https://github.com/mlflow/mlflow.git", rev = "master" }
 mlflow-skinny = { git = "https://github.com/mlflow/mlflow.git", subdirectory = "skinny", rev = "master" }
-databricks-agents = { url = "https://ml-team-public-read.s3.us-west-2.amazonaws.com/wheels/rag-studio/dev/samraj.moorjani/databricks_agents-1.0.0rc2.dev0-py3-none-any.whl" }
