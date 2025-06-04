@@ -122,7 +122,7 @@ async def env_check():
 async def get_companies():
     """Get list of all company names"""
     companies = [{"name": customer["account"]["name"]} for customer in CUSTOMER_DATA]
-    return companies
+    return sorted(companies, key=lambda x: x["name"])
 
 
 @app.get("/api/customer/{company_name}")

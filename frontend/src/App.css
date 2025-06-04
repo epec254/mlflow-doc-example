@@ -284,7 +284,64 @@ main {
   font-size: 1.1rem;
   font-weight: 500;
   padding: 1rem;
+  cursor: text;
+}
+
+/* Typeahead Container */
+.typeahead-container {
+  position: relative;
+}
+
+.typeahead-container .company-select {
+  width: 100%;
+}
+
+/* Dropdown Styles */
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.dropdown-item {
+  padding: 0.75rem 1rem;
   cursor: pointer;
+  color: #374151;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.15s ease;
+}
+
+.dropdown-item:hover {
+  background-color: #f9fafb;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item.selected {
+  background-color: #eff6ff;
+  color: #2563eb;
+  font-weight: 500;
+}
+
+.dropdown-item.no-results {
+  color: #6b7280;
+  font-style: italic;
+  cursor: default;
+}
+
+.dropdown-item.no-results:hover {
+  background-color: white;
 }
 
 /* Customer Form */
@@ -648,42 +705,140 @@ main {
 
 /* Instructions Section */
 .instructions-section {
-  margin-top: 2rem;
-  background-color: #f8fafc;
+  margin: 2rem 0;
   padding: 1.5rem;
+  background: #f8fafc;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
 }
 
 .instructions-textarea {
-  font-family: inherit;
-  resize: vertical;
+  width: 100%;
   min-height: 100px;
+  resize: vertical;
 }
 
 /* Generate Button */
 .generate-button {
-  padding: 0.625rem 1.5rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
   box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
-  white-space: nowrap;
 }
 
 .generate-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 12px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
 }
 
 .generate-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Feedback Widget */
+.feedback-widget {
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.feedback-header h4 {
+  margin: 0 0 1rem 0;
+  color: #2d3748;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.feedback-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.feedback-btn {
+  background: #f7fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 50px;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.5rem;
+  transition: all 0.2s ease;
+}
+
+.feedback-btn:hover {
+  transform: scale(1.05);
+  border-color: #cbd5e0;
+}
+
+.feedback-btn.active.thumbs-up {
+  background: #f0fff4;
+  border-color: #48bb78;
+  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
+}
+
+.feedback-btn.active.thumbs-down {
+  background: #fffaf0;
+  border-color: #ed8936;
+  box-shadow: 0 0 0 3px rgba(237, 137, 54, 0.1);
+}
+
+.feedback-comment-section {
+  /* Removed animation since it's always visible now */
+}
+
+.feedback-comment {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+  margin-bottom: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+.feedback-comment:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.feedback-submit-btn {
+  background: #4299e1;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.feedback-submit-btn:hover:not(:disabled) {
+  background: #3182ce;
+  transform: translateY(-1px);
+}
+
+.feedback-submit-btn:disabled {
+  background: #48bb78;
+  cursor: default;
+  transform: none;
 }
 
 /* Responsive Design */

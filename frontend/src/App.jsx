@@ -5,6 +5,8 @@ import './App.css';
 function App() {
   const [companies, setCompanies] = useState([]);
   const [selectedCompany, setSelectedCompany] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
   const [customerData, setCustomerData] = useState(null);
   const [userInstructions, setUserInstructions] = useState('');
   const [generatedEmail, setGeneratedEmail] = useState(null);
@@ -13,6 +15,10 @@ function App() {
   const [error, setError] = useState(null);
   const [backendStatus, setBackendStatus] = useState("Checking backend...");
   const [envStatus, setEnvStatus] = useState(null);
+  // Feedback state
+  const [feedbackRating, setFeedbackRating] = useState(null); // 'up' or 'down'
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
   useEffect(() => {
     // Check backend health
@@ -61,6 +67,8 @@ function App() {
 
   const handleCompanySelect = async (companyName) => {
     setSelectedCompany(companyName);
+    setSearchQuery(companyName);
+    setShowDropdown(false);
     setUserInstructions(''); // Reset instructions when changing companies
     
     if (!companyName) {
@@ -78,6 +86,22 @@ function App() {
       setCustomerData(null);
     }
   };
+
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    setShowDropdown(true);
+    
+    // If search is cleared, also clear selection
+    if (!value) {
+      setSelectedCompany('');
+      setCustomerData(null);
+    }
+  };
+
+  const filteredCompanies = companies.filter(company =>
+    company.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const updateNestedField = (path, value) => {
     setCustomerData(prev => {
@@ -103,6 +127,10 @@ function App() {
     setLoading(true);
     setError(null);
     setGeneratedEmail(null);
+    // Reset feedback when generating new email
+    setFeedbackRating(null);
+    setFeedbackComment('');
+    setFeedbackSubmitted(false);
     
     try {
       // Add user instructions to the customer data
@@ -124,6 +152,26 @@ function App() {
       }
     }
     setLoading(false);
+  };
+
+  const handleFeedbackRating = (rating) => {
+    setFeedbackRating(rating);
+    setFeedbackSubmitted(false);
+  };
+
+  const handleFeedbackSubmit = () => {
+    if (feedbackRating) {
+      // Here you could send feedback to backend
+      console.log('Feedback submitted:', {
+        rating: feedbackRating,
+        comment: feedbackComment,
+        email: generatedEmail
+      });
+      setFeedbackSubmitted(true);
+      
+      // You could add an API call here to save feedback
+      // axios.post('/api/feedback', { rating: feedbackRating, comment: feedbackComment, email_id: generatedEmail.id })
+    }
   };
 
   return (
@@ -150,36 +198,46 @@ function App() {
           {/* Left Panel - Input */}
           <div className="panel panel-left">
             <div className="form-section">
-              <div className="section-header-with-action">
+              <div className="section-header">
                 <h2>Customer Information</h2>
-                {customerData && (
-                  <button 
-                    onClick={handleGenerateEmail} 
-                    disabled={loading}
-                    className="generate-button"
-                  >
-                    {loading ? 'Generating 🚀' : 'Generate Email 👉'}
-                  </button>
-                )}
               </div>
               
               {/* Company Selector */}
               <div className="form-group">
                 <label htmlFor="company-select">Select Company</label>
-                <select 
-                  id="company-select"
-                  value={selectedCompany}
-                  onChange={(e) => handleCompanySelect(e.target.value)}
-                  className="company-select"
-                  disabled={loadingCompanies}
-                >
-                  <option value="">-- Select a company --</option>
-                  {companies.map((company) => (
-                    <option key={company.name} value={company.name}>
-                      {company.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="typeahead-container">
+                  <input
+                    id="company-select"
+                    type="text"
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    onFocus={() => setShowDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                    className="company-select"
+                    placeholder="Type to search companies..."
+                    disabled={loadingCompanies}
+                  />
+                  {showDropdown && filteredCompanies.length > 0 && (
+                    <div className="dropdown">
+                      {filteredCompanies.map((company) => (
+                        <div
+                          key={company.name}
+                          className={`dropdown-item ${selectedCompany === company.name ? 'selected' : ''}`}
+                          onMouseDown={() => handleCompanySelect(company.name)}
+                        >
+                          {company.name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {showDropdown && searchQuery && filteredCompanies.length === 0 && (
+                    <div className="dropdown">
+                      <div className="dropdown-item no-results">
+                        No companies found matching "{searchQuery}"
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* User Instructions - Moved here */}
@@ -201,6 +259,19 @@ function App() {
                       className="instructions-textarea"
                     />
                   </div>
+                </div>
+              )}
+
+              {/* Generate Email Button */}
+              {customerData && (
+                <div className="generate-button-section">
+                  <button 
+                    onClick={handleGenerateEmail} 
+                    disabled={loading}
+                    className="generate-button"
+                  >
+                    {loading ? 'Generating 🚀' : 'Generate Email 👉'}
+                  </button>
                 </div>
               )}
 
@@ -472,6 +543,47 @@ function App() {
 
               {generatedEmail && !loading && (
                 <div className="email-output">
+                  {/* Feedback Widget */}
+                  <div className="feedback-widget">
+                    <div className="feedback-header">
+                      <h4>How was this email?</h4>
+                    </div>
+                    <div className="feedback-buttons">
+                      <button 
+                        className={`feedback-btn thumbs-up ${feedbackRating === 'up' ? 'active' : ''}`}
+                        onClick={() => handleFeedbackRating('up')}
+                        title="Good email"
+                      >
+                        👍
+                      </button>
+                      <button 
+                        className={`feedback-btn thumbs-down ${feedbackRating === 'down' ? 'active' : ''}`}
+                        onClick={() => handleFeedbackRating('down')}
+                        title="Needs improvement"
+                      >
+                        👎
+                      </button>
+                    </div>
+                    
+                    {/* Comment section - now always visible */}
+                    <div className="feedback-comment-section">
+                      <textarea
+                        className="feedback-comment"
+                        placeholder="Share your thoughts about this email... (optional)"
+                        value={feedbackComment}
+                        onChange={(e) => setFeedbackComment(e.target.value)}
+                        rows={3}
+                      />
+                      <button 
+                        className="feedback-submit-btn"
+                        onClick={handleFeedbackSubmit}
+                        disabled={feedbackSubmitted || !feedbackRating}
+                      >
+                        {feedbackSubmitted ? '✓ Thank you!' : 'Submit Feedback'}
+                      </button>
+                    </div>
+                  </div>
+                  
                   <h3>Subject: {generatedEmail.subject_line}</h3>
                   <pre className="email-body">{generatedEmail.body}</pre>
                 </div>
