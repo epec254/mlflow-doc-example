@@ -13,6 +13,27 @@ LLM_MODEL = os.getenv("LLM_MODEL")
 if not LLM_MODEL:
     raise ValueError("LLM_MODEL environment variable is not set")
 
+
+# Load customer data from input_data.jsonl
+def load_customer_data():
+    customers = []
+    try:
+        with open("../input_data.jsonl", "r") as f:
+            for line in f:
+                customers.append(json.loads(line))
+    except FileNotFoundError:
+        # Try alternative path if backend is run from different directory
+        try:
+            with open("input_data.jsonl", "r") as f:
+                for line in f:
+                    customers.append(json.loads(line))
+        except FileNotFoundError:
+            print("Warning: input_data.jsonl not found")
+    return customers
+
+
+CUSTOMER_DATA = load_customer_data()
+
 # The following has been moved to backend/llm_utils.py:
 # - Databricks SDK and OpenAI client initialization
 # - PROMPT_V2 definition
@@ -95,6 +116,22 @@ async def env_check():
         "environment_variables": env_vars,
         "all_vars_present": all(v is not None for v in env_vars.values()),
     }
+
+
+@app.get("/api/companies")
+async def get_companies():
+    """Get list of all company names"""
+    companies = [{"name": customer["account"]["name"]} for customer in CUSTOMER_DATA]
+    return companies
+
+
+@app.get("/api/customer/{company_name}")
+async def get_customer_by_name(company_name: str):
+    """Get customer data by company name"""
+    for customer in CUSTOMER_DATA:
+        if customer["account"]["name"] == company_name:
+            return customer
+    raise HTTPException(status_code=404, detail=f"Company '{company_name}' not found")
 
 
 if __name__ == "__main__":

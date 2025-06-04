@@ -2,84 +2,20 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
 
-// Example data from input_data.jsonl (first entry)
-const defaultCustomerData = {
-  "account": {
-    "name": "SkywardAir Transport",
-    "industry": "Aviation",
-    "size": "Enterprise (4,200 employees)",
-    "main_contact": {
-      "name": "Captain Olivia Bennett",
-      "title": "Director of Operations",
-      "email": "o.bennett@skywardair.com"
-    },
-    "relationship": {
-      "customer_since": "2021-08-14",
-      "deal_stage": "Mature",
-      "account_health": "Good",
-      "last_contact_date": "2023-06-11",
-      "next_renewal": "2023-08-14"
-    }
-  },
-  "recent_activity": {
-    "meetings": [
-      {
-        "date": "2023-06-11",
-        "type": "Renewal Planning",
-        "summary": "Discussed flight operations workflow improvements. Olivia wants to expand to maintenance division. Concerned about system availability during peak travel season.",
-        "action_items": [
-          "Prepare maintenance division implementation plan",
-          "Share uptime statistics from past 12 months",
-          "Schedule technical review with IT security team"
-        ]
-      }
-    ],
-    "product_usage": {
-      "active_users": 782,
-      "active_users_change": "+4% from last month",
-      "most_used_features": [
-        "Crew Scheduling",
-        "Flight Planning",
-        "Compliance Documentation"
-      ],
-      "least_used_features": [
-        "Mobile App",
-        "Analytics Dashboard",
-        "API Integration"
-      ],
-      "potential_opportunity": "Mobile app would benefit flight crews accessing schedules remotely"
-    },
-    "support_tickets": [
-      {
-        "id": "TK-4622",
-        "status": "Resolved Today",
-        "issue": "Calendar sync issues with crew schedules",
-        "resolution": "Updated timezone handling and recurrence patterns"
-      },
-      {
-        "id": "TK-4630",
-        "status": "Open",
-        "issue": "Need custom reporting for fuel efficiency metrics",
-        "priority": "Medium"
-      }
-    ]
-  },
-  "sales_rep": {
-    "name": "Jason Mendoza",
-    "title": "Aviation Industry Director",
-    "signature": "Jason Mendoza\\nAviation Industry Director\\nCloudFlow Inc.\\n(555) 787-3434"
-  }
-};
-
 function App() {
-  const [customerInfo, setCustomerInfo] = useState(JSON.stringify(defaultCustomerData, null, 2));
+  const [companies, setCompanies] = useState([]);
+  const [selectedCompany, setSelectedCompany] = useState('');
+  const [customerData, setCustomerData] = useState(null);
+  const [userInstructions, setUserInstructions] = useState('');
   const [generatedEmail, setGeneratedEmail] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [error, setError] = useState(null);
   const [backendStatus, setBackendStatus] = useState("Checking backend...");
   const [envStatus, setEnvStatus] = useState(null);
 
   useEffect(() => {
+    // Check backend health
     axios.get('/api/health')
       .then(response => {
         if (response.data.status === 'ok') {
@@ -106,29 +42,77 @@ function App() {
         setEnvStatus({ error: error.message });
       });
 
-    // Log frontend environment variables
-    console.log('Frontend environment variables:', {
-      VITE_API_URL: import.meta.env.VITE_API_URL,
-      VITE_APP_ENV: import.meta.env.VITE_APP_ENV,
-    });
+    // Load companies
+    loadCompanies();
   }, []);
 
+  const loadCompanies = async () => {
+    try {
+      setLoadingCompanies(true);
+      const response = await axios.get('/api/companies');
+      setCompanies(response.data);
+    } catch (err) {
+      console.error("Error loading companies:", err);
+      setError("Failed to load companies");
+    } finally {
+      setLoadingCompanies(false);
+    }
+  };
+
+  const handleCompanySelect = async (companyName) => {
+    setSelectedCompany(companyName);
+    setUserInstructions(''); // Reset instructions when changing companies
+    
+    if (!companyName) {
+      setCustomerData(null);
+      return;
+    }
+
+    try {
+      const response = await axios.get(`/api/customer/${encodeURIComponent(companyName)}`);
+      setCustomerData(response.data);
+      setError(null);
+    } catch (err) {
+      console.error("Error loading customer data:", err);
+      setError("Failed to load customer data");
+      setCustomerData(null);
+    }
+  };
+
+  const updateNestedField = (path, value) => {
+    setCustomerData(prev => {
+      const newData = JSON.parse(JSON.stringify(prev)); // Deep copy
+      const keys = path.split('.');
+      let current = newData;
+      
+      for (let i = 0; i < keys.length - 1; i++) {
+        current = current[keys[i]];
+      }
+      
+      current[keys[keys.length - 1]] = value;
+      return newData;
+    });
+  };
+
   const handleGenerateEmail = async () => {
+    if (!customerData) {
+      setError("Please select a company first");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setGeneratedEmail(null);
+    
     try {
-      let parsedCustomerInfo;
-      try {
-        parsedCustomerInfo = JSON.parse(customerInfo);
-      } catch (e) {
-        setError("Invalid JSON format for customer data. Please check the input.");
-        setLoading(false);
-        return;
-      }
+      // Add user instructions to the customer data
+      const requestData = {
+        ...customerData,
+        user_instructions_for_email: userInstructions
+      };
 
       const response = await axios.post('/api/generate-email/', { 
-        customer_info: parsedCustomerInfo
+        customer_info: requestData
       });
       setGeneratedEmail(response.data);
     } catch (err) {
@@ -136,7 +120,7 @@ function App() {
       if (err.response && err.response.data && err.response.data.detail) {
         setError(`Error from backend: ${err.response.data.detail}`);
       } else {
-        setError("Failed to generate email. Check the console for more details and ensure the backend is running and configured correctly.");
+        setError("Failed to generate email. Check the console for more details.");
       }
     }
     setLoading(false);
@@ -144,78 +128,358 @@ function App() {
 
   return (
     <div className="App">
-      {envStatus && (
-        <div style={{ 
-          padding: '10px', 
-          margin: '10px', 
-          backgroundColor: envStatus.all_vars_present ? '#e6ffe6' : '#ffe6e6',
-          borderRadius: '4px'
-        }}>
-          <h3>Environment Variables Status</h3>
-          <pre>{JSON.stringify(envStatus, null, 2)}</pre>
+      {envStatus && envStatus.all_vars_present && (
+        <div className="mlflow-banner">
+          <h3>MLflow Tracing</h3>
+          <button 
+            className="mlflow-button"
+            onClick={() => window.open(`${import.meta.env.VITE_DATABRICKS_HOST}/ml/experiments/${import.meta.env.VITE_MLFLOW_EXPERIMENT_ID}/traces`, '_blank')}
+          >
+            View MLflow Tracing
+          </button>
         </div>
       )}
-      <div style={{ 
-        padding: '10px', 
-        margin: '10px', 
-        backgroundColor: '#e6f3ff',
-        borderRadius: '4px'
-      }}>
-        <h3>MLflow Tracing</h3>
-        <button 
-          onClick={() => window.open(`${import.meta.env.VITE_DATABRICKS_HOST}/ml/experiments/${import.meta.env.VITE_MLFLOW_EXPERIMENT_ID}/traces`, '_blank')}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#0066cc',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          View MLflow Tracing
-        </button>
-      </div>
+      
       <header className="App-header">
         <h1>Personalized Email Generator</h1>
         <p className="backend-status">{backendStatus}</p>
       </header>
+      
       <main>
-        <div className="input-section">
-          <h2>Customer Data (JSON)</h2>
-          <p>Paste your customer JSON data below. An example is pre-filled.</p>
-          <textarea
-            value={customerInfo}
-            onChange={(e) => setCustomerInfo(e.target.value)}
-            rows={25}
-            cols={80}
-            placeholder='Paste customer JSON data here'
-          />
-          <button onClick={handleGenerateEmail} disabled={loading}>
-            {loading ? 'Generating...' : 'Generate Email'}
-          </button>
-        </div>
+        <div className="panels-container">
+          {/* Left Panel - Input */}
+          <div className="panel panel-left">
+            <div className="form-section">
+              <div className="section-header-with-action">
+                <h2>Customer Information</h2>
+                {customerData && (
+                  <button 
+                    onClick={handleGenerateEmail} 
+                    disabled={loading}
+                    className="generate-button"
+                  >
+                    {loading ? 'Generating 🚀' : 'Generate Email 👉'}
+                  </button>
+                )}
+              </div>
+              
+              {/* Company Selector */}
+              <div className="form-group">
+                <label htmlFor="company-select">Select Company</label>
+                <select 
+                  id="company-select"
+                  value={selectedCompany}
+                  onChange={(e) => handleCompanySelect(e.target.value)}
+                  className="company-select"
+                  disabled={loadingCompanies}
+                >
+                  <option value="">-- Select a company --</option>
+                  {companies.map((company) => (
+                    <option key={company.name} value={company.name}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-        {error && (
-          <div className="error-message">
-            <h3>Error</h3>
-            <pre>{error}</pre>
-          </div>
-        )}
+              {/* User Instructions - Moved here */}
+              {customerData && (
+                <div className="instructions-section">
+                  <div className="form-section-header">
+                    <h3>Email Instructions</h3>
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="user-instructions">
+                      Add any specific instructions or context for the email
+                    </label>
+                    <textarea
+                      id="user-instructions"
+                      value={userInstructions}
+                      onChange={(e) => setUserInstructions(e.target.value)}
+                      placeholder="E.g., Mention the upcoming product launch, emphasize our new pricing model, schedule a demo for next week..."
+                      rows={4}
+                      className="instructions-textarea"
+                    />
+                  </div>
+                </div>
+              )}
 
-        {generatedEmail && (
-          <div className="output-section">
-            <h2>Generated Email</h2>
-            <div className="email-output">
-              <h3>Subject: {generatedEmail.subject_line}</h3>
-              <pre className="email-body">{generatedEmail.body}</pre>
+              {/* Customer Data Form */}
+              {customerData && (
+                <>
+                  <div className="customer-form">
+                    {/* Account Information */}
+                    <div className="form-section-header">
+                      <h3>Account Details</h3>
+                    </div>
+                    
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>Industry</label>
+                        <input
+                          type="text"
+                          value={customerData.account.industry}
+                          onChange={(e) => updateNestedField('account.industry', e.target.value)}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Size</label>
+                        <input
+                          type="text"
+                          value={customerData.account.size}
+                          onChange={(e) => updateNestedField('account.size', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Main Contact */}
+                    <div className="form-section-header">
+                      <h3>Main Contact</h3>
+                    </div>
+                    
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>Name</label>
+                        <input
+                          type="text"
+                          value={customerData.account.main_contact.name}
+                          onChange={(e) => updateNestedField('account.main_contact.name', e.target.value)}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Title</label>
+                        <input
+                          type="text"
+                          value={customerData.account.main_contact.title}
+                          onChange={(e) => updateNestedField('account.main_contact.title', e.target.value)}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Email</label>
+                        <input
+                          type="email"
+                          value={customerData.account.main_contact.email}
+                          onChange={(e) => updateNestedField('account.main_contact.email', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Relationship Status */}
+                    <div className="form-section-header">
+                      <h3>Relationship Status</h3>
+                    </div>
+                    
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>Customer Since</label>
+                        <input
+                          type="date"
+                          value={customerData.account.relationship.customer_since}
+                          onChange={(e) => updateNestedField('account.relationship.customer_since', e.target.value)}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Deal Stage</label>
+                        <select
+                          value={customerData.account.relationship.deal_stage}
+                          onChange={(e) => updateNestedField('account.relationship.deal_stage', e.target.value)}
+                        >
+                          <option value="New Customer">New Customer</option>
+                          <option value="Onboarding">Onboarding</option>
+                          <option value="Implementation">Implementation</option>
+                          <option value="Growth">Growth</option>
+                          <option value="Mature">Mature</option>
+                          <option value="Expansion">Expansion</option>
+                          <option value="At Risk">At Risk</option>
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label>Account Health</label>
+                        <select
+                          value={customerData.account.relationship.account_health}
+                          onChange={(e) => updateNestedField('account.relationship.account_health', e.target.value)}
+                          className={`health-select health-${customerData.account.relationship.account_health.toLowerCase()}`}
+                        >
+                          <option value="Excellent">Excellent</option>
+                          <option value="Good">Good</option>
+                          <option value="Fair">Fair</option>
+                          <option value="Poor">Poor</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Recent Activity Summary */}
+                    <div className="form-section-header">
+                      <h3>Recent Activity</h3>
+                    </div>
+                    
+                    <div className="activity-summary">
+                      <div className="stat-card">
+                        <span className="stat-label">Active Users</span>
+                        <span className="stat-value">{customerData.recent_activity.product_usage.active_users}</span>
+                        <span className="stat-change">{customerData.recent_activity.product_usage.active_users_change}</span>
+                      </div>
+                      <div className="stat-card">
+                        <span className="stat-label">Last Meeting</span>
+                        <span className="stat-value">{customerData.recent_activity.meetings[0]?.date || 'N/A'}</span>
+                        <span className="stat-subtitle">{customerData.recent_activity.meetings[0]?.type || ''}</span>
+                      </div>
+                      <div className="stat-card">
+                        <span className="stat-label">Open Tickets</span>
+                        <span className="stat-value">
+                          {customerData.recent_activity.support_tickets.filter(t => t.status.includes('Open')).length}
+                        </span>
+                        <span className="stat-subtitle">Support Issues</span>
+                      </div>
+                    </div>
+
+                    {/* Meetings Details */}
+                    {customerData.recent_activity.meetings.length > 0 && (
+                      <div className="activity-details">
+                        <h4>Recent Meetings</h4>
+                        {customerData.recent_activity.meetings.map((meeting, idx) => (
+                          <div key={idx} className="meeting-card">
+                            <div className="meeting-header">
+                              <span className="meeting-type">{meeting.type}</span>
+                              <span className="meeting-date">{meeting.date}</span>
+                            </div>
+                            <p className="meeting-summary">{meeting.summary}</p>
+                            {meeting.action_items && meeting.action_items.length > 0 && (
+                              <div className="action-items">
+                                <strong>Action Items:</strong>
+                                <ul>
+                                  {meeting.action_items.map((item, itemIdx) => (
+                                    <li key={itemIdx}>{item}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Product Usage */}
+                    <div className="activity-details">
+                      <h4>Product Usage Insights</h4>
+                      <div className="usage-grid">
+                        <div className="usage-section">
+                          <h5>Most Used Features</h5>
+                          <ul className="feature-list">
+                            {customerData.recent_activity.product_usage.most_used_features.map((feature, idx) => (
+                              <li key={idx} className="feature-item used">{feature}</li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div className="usage-section">
+                          <h5>Least Used Features</h5>
+                          <ul className="feature-list">
+                            {customerData.recent_activity.product_usage.least_used_features.map((feature, idx) => (
+                              <li key={idx} className="feature-item unused">{feature}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                      {customerData.recent_activity.product_usage.potential_opportunity && (
+                        <div className="opportunity-box">
+                          <strong>Opportunity:</strong> {customerData.recent_activity.product_usage.potential_opportunity}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Support Tickets */}
+                    {customerData.recent_activity.support_tickets.length > 0 && (
+                      <div className="activity-details">
+                        <h4>Support Tickets</h4>
+                        <div className="tickets-grid">
+                          {customerData.recent_activity.support_tickets.map((ticket, idx) => (
+                            <div key={idx} className={`ticket-card ${ticket.status.includes('Open') ? 'open' : 'resolved'}`}>
+                              <div className="ticket-header">
+                                <span className="ticket-id">{ticket.id}</span>
+                                <span className={`ticket-status ${ticket.status.toLowerCase().replace(/\s+/g, '-')}`}>
+                                  {ticket.status}
+                                </span>
+                              </div>
+                              <p className="ticket-issue">{ticket.issue}</p>
+                              {ticket.priority && (
+                                <span className={`ticket-priority priority-${ticket.priority.toLowerCase()}`}>
+                                  Priority: {ticket.priority}
+                                </span>
+                              )}
+                              {ticket.resolution && (
+                                <p className="ticket-resolution">
+                                  <strong>Resolution:</strong> {ticket.resolution}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sales Rep */}
+                    <div className="form-section-header">
+                      <h3>Sales Representative</h3>
+                    </div>
+                    
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>Name</label>
+                        <input
+                          type="text"
+                          value={customerData.sales_rep.name}
+                          onChange={(e) => updateNestedField('sales_rep.name', e.target.value)}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Title</label>
+                        <input
+                          type="text"
+                          value={customerData.sales_rep.title}
+                          onChange={(e) => updateNestedField('sales_rep.title', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
-        )}
+
+          {/* Right Panel - Output */}
+          <div className="panel panel-right">
+            <div className="output-section">
+              <h2>Generated Email</h2>
+              
+              {!generatedEmail && !loading && (
+                <div className="empty-state">
+                  <p>Select a company and click "Generate Email" to see the personalized email here.</p>
+                </div>
+              )}
+              
+              {loading && (
+                <div className="loading-state">
+                  <p>Generating personalized email...</p>
+                </div>
+              )}
+              
+              {error && (
+                <div className="error-message">
+                  <h3>Error</h3>
+                  <pre>{error}</pre>
+                </div>
+              )}
+
+              {generatedEmail && !loading && (
+                <div className="email-output">
+                  <h3>Subject: {generatedEmail.subject_line}</h3>
+                  <pre className="email-body">{generatedEmail.body}</pre>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </main>
-      <footer>
-        <p>CloudFlow Inc. Demo</p>
-      </footer>
     </div>
   );
 }
