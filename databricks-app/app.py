@@ -14,6 +14,7 @@ import uvicorn
 # Import from the llm_utils module
 from llm_utils import (
     core_generate_email_logic,
+    set_app_version,
     PROMPT_V2,
     openai_client,
     stream_generate_email_logic,
@@ -100,6 +101,7 @@ async def query():
 async def api_generate_email(request_data: EmailRequest):
     customer_data_dict = request_data.customer_info
     try:
+        set_app_version()
         email_json = core_generate_email_logic(
             customer_data_dict, PROMPT_V2, model=LLM_MODEL
         )
@@ -127,6 +129,7 @@ async def api_generate_email(request_data: EmailRequest):
 async def api_generate_email_stream(request_data: EmailRequest):
     """Stream email generation token by token using Server-Sent Events"""
     customer_data_dict = request_data.customer_info
+    set_app_version()
 
     async def generate():
         try:

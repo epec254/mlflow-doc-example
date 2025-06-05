@@ -108,11 +108,63 @@ EOF
         
     done < "$temp_vars"
     
+    # Add GIT_COMMIT_HASH if it's set in the environment
+    if [[ -n "$GIT_COMMIT_HASH" ]]; then
+        echo "  - name: 'GIT_COMMIT_HASH'" >> "$temp_yaml"
+        echo "    value: '$GIT_COMMIT_HASH'" >> "$temp_yaml"
+        echo "Added GIT_COMMIT_HASH to app.yaml: $GIT_COMMIT_HASH"
+    fi
+    
     # Replace the original app.yaml
     mv "$temp_yaml" "$app_yaml"
     rm -f "$temp_vars"
     echo "Updated $app_yaml with environment variables from $env_file"
 }
+
+# Set GIT_COMMIT_HASH environment variable using deterministic git logic
+set_git_commit_hash() {
+    # Check if GIT_COMMIT_HASH is already set
+    if [[ -n "$GIT_COMMIT_HASH" ]]; then
+        echo "GIT_COMMIT_HASH already set: $GIT_COMMIT_HASH"
+        return
+    fi
+    
+    echo "Determining git commit hash..."
+    
+    # Get HEAD commit hash
+    if ! head_hash=$(git rev-parse HEAD 2>/dev/null); then
+        echo "Warning: Failed to get git HEAD hash"
+        return
+    fi
+    
+    # Check if repository is dirty
+    if git_status_output=$(git status --porcelain 2>/dev/null) && [[ -n "$git_status_output" ]]; then
+        # Repository has uncommitted changes, create deterministic hash
+        echo "Repository is dirty, creating deterministic hash..."
+        
+        if diff_content=$(git diff HEAD 2>/dev/null); then
+            # Create deterministic hash from HEAD + diff
+            content_to_hash="$head_hash"$'\n'"$diff_content"
+            changes_hash=$(echo -n "$content_to_hash" | shasum -a 256 | cut -d' ' -f1)
+            
+            # Combine HEAD hash (first 32 chars) + dirty indicator + changes hash (first 8 chars)
+            export GIT_COMMIT_HASH="${head_hash:0:32}-dirty-${changes_hash:0:8}"
+            echo "Set GIT_COMMIT_HASH (dirty): $GIT_COMMIT_HASH"
+        else
+            echo "Warning: Failed to get git diff, using HEAD only"
+            export GIT_COMMIT_HASH="$head_hash"
+            echo "Set GIT_COMMIT_HASH (fallback): $GIT_COMMIT_HASH"
+        fi
+    else
+        # Repository is clean, use HEAD hash
+        echo "Repository is clean, using HEAD hash..."
+        export GIT_COMMIT_HASH="$head_hash"
+        echo "Set GIT_COMMIT_HASH (clean): $GIT_COMMIT_HASH"
+    fi
+}
+
+# Set the git commit hash
+set_git_commit_hash
 
 # Update app.yaml with environment variables
 update_app_yaml

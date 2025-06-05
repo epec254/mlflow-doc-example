@@ -3,6 +3,7 @@ import os
 import mlflow
 from databricks.sdk import WorkspaceClient
 import asyncio
+import subprocess
 
 mlflow.openai.autolog()
 
@@ -71,6 +72,8 @@ If the user provides a specific instruction, you must follow only follow those i
 def core_generate_email_logic(customer_data: dict, prompt_template: str, model: str):
     if not openai_client:
         raise RuntimeError("OpenAI client not available")
+
+    set_app_version()
 
     response = openai_client.chat.completions.create(
         model=model,
@@ -160,6 +163,7 @@ async def stream_generate_email_logic(
         yield {"type": "error", "error": "OpenAI client not available"}
         return
 
+    set_app_version()
     #  try:
     # Create streaming response
     response = openai_client.chat.completions.create(
@@ -227,3 +231,60 @@ async def stream_generate_email_logic(
 
     #  except Exception as e:
     #      yield {"type": "error", "error": str(e)}
+
+
+def set_app_version():
+    # Check if GIT_COMMIT_HASH environment variable is set
+    git_hash = os.getenv("GIT_COMMIT_HASH")
+
+    if git_hash:
+        logged_model_name = git_hash
+    else:
+        logged_model_name = get_current_git_hash()
+
+    # Set the active model context
+    mlflow.set_active_model(name=logged_model_name)
+
+
+def get_current_git_hash():
+    """
+    Get a deterministic hash representing the current git state.
+    For clean repositories, returns the HEAD commit hash.
+    For dirty repositories, returns a combination of HEAD + hash of changes.
+    """
+    import hashlib
+
+    try:
+        # Get the current HEAD commit hash
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        )
+        head_hash = result.stdout.strip()
+
+        # Check if repository is dirty
+        result = subprocess.run(
+            ["git", "status", "--porcelain"], capture_output=True, text=True, check=True
+        )
+
+        if not result.stdout.strip():
+            # Repository is clean, return HEAD hash
+            return head_hash
+
+        # Repository is dirty, create deterministic hash of changes
+        # Get diff of all changes (staged and unstaged)
+        result = subprocess.run(
+            ["git", "diff", "HEAD"], capture_output=True, text=True, check=True
+        )
+        diff_content = result.stdout
+
+        # Create deterministic hash from HEAD + diff
+        content_to_hash = f"{head_hash}\n{diff_content}"
+        changes_hash = hashlib.sha256(content_to_hash.encode()).hexdigest()
+
+        # Return HEAD hash + first 8 chars of changes hash
+        return f"{head_hash[:32]}-dirty-{changes_hash[:8]}"
+
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"Git command failed: {e}")
+    except FileNotFoundError:
+        raise RuntimeError("Git is not installed or not in PATH")
