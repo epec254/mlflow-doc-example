@@ -1,6 +1,21 @@
 #!/bin/bash
-LAKEHOUSE_APP_NAME=genai-email-demo
-APP_FOLDER_IN_WORKSPACE=/Workspace/Users/eric.peter@databricks.com/genai-email-demo
+
+# Source .env file if it exists
+if [[ -f ".env" ]]; then
+    # Export all variables from .env file
+    set -a
+    source .env
+    set +a
+else
+    echo "Error: .env file not found. Please create one with required variables."
+    exit 1
+fi
+
+# Check if required variables are set
+if [[ -z "$LAKEHOUSE_APP_NAME" || -z "$APP_FOLDER_IN_WORKSPACE" ]]; then
+    echo "Error: Required environment variables LAKEHOUSE_APP_NAME and APP_FOLDER_IN_WORKSPACE are not set in .env file."
+    exit 1
+fi
 
 # Function to update app.yaml with environment variables from .env
 update_app_yaml() {
@@ -98,8 +113,6 @@ EOF
     rm -f "$temp_vars"
     echo "Updated $app_yaml with environment variables from $env_file"
 }
-
-
 
 # Update app.yaml with environment variables
 update_app_yaml

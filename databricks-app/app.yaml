@@ -16,3 +16,7 @@ env:
     value: '380962412404969'
   - name: 'BACKEND_URL'
     value: 'https://genai-email-demo-2556758628403379.aws.databricksapps.com'
+  - name: 'LAKEHOUSE_APP_NAME'
+    value: 'genai-email-demo'
+  - name: 'APP_FOLDER_IN_WORKSPACE'
+    value: '/Workspace/Users/eric.peter@databricks.com/genai-email-demo'

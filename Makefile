@@ -4,11 +4,15 @@ export
 
 start:
 	@echo "Starting backend server..."
-	@(cd backend && source .venv/bin/activate && uvicorn main:app --reload --port 8000) &
+	@(source .venv/bin/activate && cd databricks-app && uvicorn app:app --reload --port 8000) &
 	@echo "Starting frontend development server..."
 	@(cd frontend && npm run dev)
 
-.PHONY: start install backend_install frontend_install
+deploy:
+	@echo "Running deployment script..."
+	@bash deploy.sh
+
+.PHONY: start install backend_install frontend_install deploy
 
 install: backend_install frontend_install
 	@echo "Project setup complete. Backend and frontend dependencies installed."
