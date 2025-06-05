@@ -200,6 +200,9 @@ async def stream_generate_email_logic(
         user_instructions = customer_data.get("user_input")
         if user_instructions is None or len(user_instructions) == 0:
             user_instructions = "No instructions provided"
+            mlflow.update_current_trace(tags={"user_instructions": "no"})
+        else:
+            mlflow.update_current_trace(tags={"user_instructions": "yes"})
 
         mlflow.update_current_trace(
             request_preview=f"Customer: {customer_data['account']['name']}; User Instructions: {user_instructions}",

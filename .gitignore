@@ -26,3 +26,7 @@ frontend/package-lock.json
 sample_code/__pycache__/prompt_judge_sdk.cpython-311.pyc
 databricks-app/app.yaml
 .DS_Store
+
+.venv/
+
+.mypy_cache/
