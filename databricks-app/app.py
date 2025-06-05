@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional, AsyncGenerator
 from enum import Enum
@@ -227,6 +228,12 @@ async def submit_feedback(feedback: FeedbackRequest):
         return FeedbackResponse(
             success=False, message=f"Error submitting feedback: {str(e)}"
         )
+
+
+# Mount static files - this must be after all API routes
+# Check if static directory exists before mounting
+if os.path.exists("static"):
+    app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 
 PORT = int(os.getenv("UVICORN_PORT", 8000))

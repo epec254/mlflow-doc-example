@@ -42,7 +42,7 @@ function App() {
       });
 
     // Check backend environment variables
-    fetch('http://localhost:8000/api/env-check')
+    fetch('/api/env-check')
       .then(response => response.json())
       .then(data => {
         setEnvStatus(data);
@@ -157,7 +157,7 @@ function App() {
         
       };
 
-      const response = await fetch('http://localhost:8000/api/generate-email-stream/', {
+      const response = await fetch('/api/generate-email-stream/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
