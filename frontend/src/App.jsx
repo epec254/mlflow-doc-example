@@ -316,7 +316,7 @@ function App() {
 
   return (
     <div className="App">
-      {envStatus && envStatus.all_vars_present && (
+      {import.meta.env.VITE_DATABRICKS_HOST && import.meta.env.VITE_MLFLOW_EXPERIMENT_ID && (
         <div className="mlflow-banner">
           <h3>MLflow Tracing</h3>
           <button 

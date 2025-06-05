@@ -102,6 +102,47 @@ EOF
 # Update app.yaml with environment variables
 update_app_yaml
 
+# Frontend build and import
+(
+  cd frontend
+  
+  # Extract VITE variables from app.yaml
+  echo "Extracting VITE variables from app.yaml..."
+  if [[ -f "../databricks-app/app.yaml" ]]; then
+    # Parse YAML to extract VITE variables
+    export VITE_DATABRICKS_HOST=$(grep -A1 "name: 'VITE_DATABRICKS_HOST'" ../databricks-app/app.yaml | grep "value:" | sed "s/.*value: '\(.*\)'/\1/")
+    export VITE_MLFLOW_EXPERIMENT_ID=$(grep -A1 "name: 'VITE_MLFLOW_EXPERIMENT_ID'" ../databricks-app/app.yaml | grep "value:" | sed "s/.*value: '\(.*\)'/\1/")
+    
+    if [[ -n "$VITE_DATABRICKS_HOST" ]]; then
+      echo "Exported VITE_DATABRICKS_HOST=$VITE_DATABRICKS_HOST"
+    fi
+    if [[ -n "$VITE_MLFLOW_EXPERIMENT_ID" ]]; then
+      echo "Exported VITE_MLFLOW_EXPERIMENT_ID=$VITE_MLFLOW_EXPERIMENT_ID"
+    fi
+  else
+    echo "Warning: app.yaml not found, VITE variables will not be set"
+  fi
+  
+  npm run build:ignore-types
+  # Copy the built files to databricks-app/static
+  rm -rf ../databricks-app/static
+  cp -r dist ../databricks-app/static
+  echo "Frontend build complete and copied to databricks-app/static"
+) &
+
+# Backend packaging - databricks-app is already structured, just need to import it
+(
+  databricks workspace import-dir databricks-app "$APP_FOLDER_IN_WORKSPACE" --overwrite
+#   cd databricks-app
+  # Import the application including the static directory
+#   databricks workspace import-dir . "$APP_FOLDER_IN_WORKSPACE" --overwrite
+) &
+
+# Wait for both background processes to finish
+wait
+
 # Deploy the application
-databricks workspace import-dir databricks-app "$APP_FOLDER_IN_WORKSPACE" --overwrite
 databricks apps deploy "$LAKEHOUSE_APP_NAME" --source-code-path="$APP_FOLDER_IN_WORKSPACE"
+
+# Print the app page URL -- put your workspace name in the below URL.
+echo "Deployed!"
