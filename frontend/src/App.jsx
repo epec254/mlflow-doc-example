@@ -427,19 +427,64 @@ function App() {
                     <div className="form-row">
                       <div className="form-group">
                         <label>Industry</label>
-                        <input
-                          type="text"
+                        <select
                           value={customerData.account.industry}
                           onChange={(e) => updateNestedField('account.industry', e.target.value)}
-                        />
+                        >
+                          <option value="">Select Industry</option>
+                          <option value="Aerospace">Aerospace</option>
+                          <option value="Agriculture">Agriculture</option>
+                          <option value="Architecture">Architecture</option>
+                          <option value="Automotive">Automotive</option>
+                          <option value="Banking">Banking</option>
+                          <option value="Biotechnology">Biotechnology</option>
+                          <option value="Construction">Construction</option>
+                          <option value="Consulting">Consulting</option>
+                          <option value="E-commerce">E-commerce</option>
+                          <option value="Education">Education</option>
+                          <option value="Energy & Utilities">Energy & Utilities</option>
+                          <option value="Engineering">Engineering</option>
+                          <option value="Entertainment & Media">Entertainment & Media</option>
+                          <option value="Environmental Services">Environmental Services</option>
+                          <option value="Fashion">Fashion</option>
+                          <option value="Food & Beverage">Food & Beverage</option>
+                          <option value="Government">Government</option>
+                          <option value="Healthcare">Healthcare</option>
+                          <option value="Hospitality">Hospitality</option>
+                          <option value="Insurance">Insurance</option>
+                          <option value="Legal Services">Legal Services</option>
+                          <option value="Manufacturing">Manufacturing</option>
+                          <option value="Non-profit">Non-profit</option>
+                          <option value="Pharmaceuticals">Pharmaceuticals</option>
+                          <option value="Real Estate">Real Estate</option>
+                          <option value="Retail">Retail</option>
+                          <option value="Software">Software</option>
+                          <option value="Sports & Recreation">Sports & Recreation</option>
+                          <option value="Technology">Technology</option>
+                          <option value="Transportation & Logistics">Transportation & Logistics</option>
+                        </select>
                       </div>
                       <div className="form-group">
                         <label>Size</label>
-                        <input
-                          type="text"
+                        <select
                           value={customerData.account.size}
                           onChange={(e) => updateNestedField('account.size', e.target.value)}
-                        />
+                        >
+                          <option value="">Select Size</option>
+                          <optgroup label="Simple Categories">
+                            <option value="Small Business">Small Business</option>
+                            <option value="Mid-market">Mid-market</option>
+                            <option value="Enterprise">Enterprise</option>
+                          </optgroup>
+                          <optgroup label="Detailed Categories">
+                            <option value="Small Business (10-50 employees)">Small Business (10-50 employees)</option>
+                            <option value="Small Business (51-100 employees)">Small Business (51-100 employees)</option>
+                            <option value="Mid-market (101-500 employees)">Mid-market (101-500 employees)</option>
+                            <option value="Mid-market (501-1000 employees)">Mid-market (501-1000 employees)</option>
+                            <option value="Enterprise (1001-5000 employees)">Enterprise (1001-5000 employees)</option>
+                            <option value="Enterprise (5000+ employees)">Enterprise (5000+ employees)</option>
+                          </optgroup>
+                        </select>
                       </div>
                     </div>
 
