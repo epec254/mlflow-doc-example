@@ -20,3 +20,5 @@ env:
     value: 'genai-email-demo'
   - name: 'APP_FOLDER_IN_WORKSPACE'
     value: '/Workspace/Users/eric.peter@databricks.com/genai-email-demo'
+  - name: 'GIT_COMMIT_HASH'
+    value: 'ece0c6b69e175a3998b73e6c21ab398f-dirty-31b336e8'
