@@ -30,3 +30,6 @@ databricks-app/app.yaml
 .venv/
 
 .mypy_cache/
+
+databricks-app/app.yaml
+databricks-app/requirements.txt
