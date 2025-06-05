@@ -1,2 +1,11 @@
-uvicorn
 fastapi
+uvicorn[standard]
+databricks-sdk[openai]>=0.54.0
+pydantic>=2
+starlette>=0.46.2
+click>=8.2.1
+openai>=1.82.0
+https://ml-team-public-read.s3.us-west-2.amazonaws.com/wheels/databricks-agents/staging/databricks_agents-1.0.0rc3-py3-none-any.whl 
+git+https://github.com/mlflow/mlflow.git@master
+git+https://github.com/mlflow/mlflow.git@master#subdirectory=skinny                          
+requests
