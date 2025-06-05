@@ -1,0 +1,25 @@
+[project]
+name = "databricks-app"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp>=3.12.9",
+    "click>=8.2.1",
+    "databricks-agents",
+    "databricks-sdk[openai]>=0.54.0",
+    "fastapi>=0.115.12",
+    "mlflow",
+    "mlflow-skinny",
+    "openai>=1.82.0",
+    "pydantic>=2",
+    "requests>=2.32.3",
+    "starlette>=0.46.2",
+    "uvicorn[standard]>=0.34.3",
+]
+
+[tool.uv.sources]
+databricks-agents = { url = "https://ml-team-public-read.s3.us-west-2.amazonaws.com/wheels/databricks-agents/staging/databricks_agents-1.0.0rc3-py3-none-any.whl" }
+mlflow = { git = "https://github.com/mlflow/mlflow.git", rev = "master" }
+mlflow-skinny = { git = "https://github.com/mlflow/mlflow.git", subdirectory = "skinny", rev = "master" }

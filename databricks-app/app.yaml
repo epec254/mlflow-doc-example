@@ -14,3 +14,5 @@ env:
     value: 'https://e2-demo-west.cloud.databricks.com'
   - name: 'VITE_MLFLOW_EXPERIMENT_ID'
     value: '380962412404969'
+  - name: 'BACKEND_URL'
+    value: 'https://genai-email-demo-2556758628403379.aws.databricksapps.com'

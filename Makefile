@@ -15,10 +15,9 @@ install: backend_install frontend_install
 
 backend_install:
 	@echo "--- Setting up backend ---"
-	@cd backend && \
-	  echo "Creating virtual environment with uv..." && \
+	@echo "Creating virtual environment with uv..." && \
 	  uv venv && \
-	  echo "Installing Python dependencies with uv from pyproject.toml..." && \
+	  echo "Installing Python dependencies with uv from backend/pyproject.toml..." && \
 	  uv pip sync pyproject.toml
 	@echo "--- Backend setup complete ---"
 

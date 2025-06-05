@@ -99,6 +99,8 @@ EOF
     echo "Updated $app_yaml with environment variables from $env_file"
 }
 
+
+
 # Update app.yaml with environment variables
 update_app_yaml
 
@@ -132,6 +134,11 @@ update_app_yaml
 
 # Backend packaging - databricks-app is already structured, just need to import it
 (
+  # Freeze uv environment to requirements.txt
+  echo "Freezing uv environment to requirements.txt..."
+  uv pip compile pyproject.toml > databricks-app/requirements.txt
+  echo "Requirements exported to databricks-app/requirements.txt"
+  
   databricks workspace import-dir databricks-app "$APP_FOLDER_IN_WORKSPACE" --overwrite
 #   cd databricks-app
   # Import the application including the static directory
