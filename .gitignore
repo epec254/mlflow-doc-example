@@ -33,3 +33,5 @@ databricks-app/app.yaml
 
 databricks-app/app.yaml
 databricks-app/requirements.txt
+
+__pycache__

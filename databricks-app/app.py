@@ -15,16 +15,9 @@ import uvicorn
 from llm_utils import (
     core_generate_email_logic,
     set_app_version,
-    PROMPT_V2,
     openai_client,
     stream_generate_email_logic,
 )
-
-# Get model name from environment variable with a default fallback
-LLM_MODEL = os.getenv("LLM_MODEL")
-
-if not LLM_MODEL:
-    raise ValueError("LLM_MODEL environment variable is not set")
 
 
 # Load customer data from input_data.jsonl
@@ -102,9 +95,7 @@ async def api_generate_email(request_data: EmailRequest):
     customer_data_dict = request_data.customer_info
     try:
         set_app_version()
-        email_json = core_generate_email_logic(
-            customer_data_dict, PROMPT_V2, model=LLM_MODEL
-        )
+        email_json = core_generate_email_logic(customer_data_dict)
         if (
             not isinstance(email_json, dict)
             or "subject_line" not in email_json
@@ -134,9 +125,7 @@ async def api_generate_email_stream(request_data: EmailRequest):
     async def generate():
         try:
             # Stream tokens from the LLM
-            async for chunk in stream_generate_email_logic(
-                customer_data_dict, PROMPT_V2, model=LLM_MODEL
-            ):
+            async for chunk in stream_generate_email_logic(customer_data_dict):
                 # Format as Server-Sent Event
                 if chunk["type"] == "token":
                     yield f"data: {json.dumps({'type': 'token', 'content': chunk['content']})}\n\n"

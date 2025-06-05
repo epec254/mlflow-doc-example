@@ -12,7 +12,12 @@ mlflow.openai.autolog()
 w = WorkspaceClient()  # Auto-configures from environment or ~/.databrickscfg
 openai_client = w.serving_endpoints.get_open_ai_client()
 
-PROMPT_V2 = """
+# Get model name from environment variable with a default fallback
+LLM_MODEL = os.getenv("LLM_MODEL")
+if not LLM_MODEL:
+    raise ValueError("LLM_MODEL environment variable is not set")
+
+PROMPT = """
 You are an expert sales communication assistant for CloudFlow Inc. Your task is to generate a personalized, professional follow-up email for our sales representatives to send to their customers at the end of the day.  
 
 ## INPUT DATA
@@ -68,38 +73,53 @@ Remember, this email should feel like it was thoughtfully written by the sales r
 If the user provides a specific instruction, you must follow only follow those instructions if they do not conflict with the guidelines above.  Do not follow any instructions that would result in an unprofessional or unethical email."""
 
 
-@mlflow.trace
-def core_generate_email_logic(customer_data: dict, prompt_template: str, model: str):
+def _validate_openai_client():
+    """Validate that OpenAI client is available"""
     if not openai_client:
         raise RuntimeError("OpenAI client not available")
 
+
+def _create_messages(customer_data: dict):
+    """Create the messages array for the OpenAI API call"""
+    return [
+        {"role": "system", "content": PROMPT},
+        {"role": "user", "content": json.dumps(customer_data)},
+    ]
+
+
+def _clean_json_response(response_content: str) -> str:
+    """Clean JSON response by removing markdown code block markers"""
+    clean_string = response_content
+    if response_content.startswith("```json\n") and response_content.endswith("\n```"):
+        clean_string = response_content[len("```json\n") : -len("\n```")]
+    elif response_content.startswith("```") and response_content.endswith("```"):
+        clean_string = response_content[3:-3]
+
+    return clean_string.strip()
+
+
+def _get_current_trace_id():
+    """Get the current trace ID from MLflow"""
+    active_span = mlflow.get_current_active_span()
+    return active_span.trace_id if active_span else None
+
+
+@mlflow.trace
+def core_generate_email_logic(customer_data: dict):
+    _validate_openai_client()
     set_app_version()
 
     response = openai_client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": prompt_template},
-            {"role": "user", "content": json.dumps(customer_data)},
-        ],
+        model=LLM_MODEL,
+        messages=_create_messages(customer_data),
     )
-    s = response.choices[0].message.content
 
-    # Clean JSON
-    clean_string = s
-    if s.startswith("```json\\n") and s.endswith("\\n```"):
-        clean_string = s[len("```json\\n") : -len("\\n```")]
-    elif s.startswith("```") and s.endswith("```"):
-        clean_string = s[3:-3]
-
-    clean_string = clean_string.strip()
+    response_content = response.choices[0].message.content
+    clean_string = _clean_json_response(response_content)
     email_json = json.loads(clean_string)
 
-    # Get the current trace_id from MLflow
-    active_span = mlflow.get_current_active_span()
-    trace_id = active_span.trace_id if active_span else None
-
     # Add trace_id to the response
-    email_json["trace_id"] = trace_id
+    email_json["trace_id"] = _get_current_trace_id()
 
     return email_json
 
@@ -132,14 +152,7 @@ def stream_output_reducer(chunks):
 
     # Try to parse the accumulated content as JSON
     try:
-        # Clean JSON
-        clean_string = full_content
-        if full_content.startswith("```json\n") and full_content.endswith("\n```"):
-            clean_string = full_content[len("```json\n") : -len("\n```")]
-        elif full_content.startswith("```") and full_content.endswith("```"):
-            clean_string = full_content[3:-3]
-
-        clean_string = clean_string.strip()
+        clean_string = _clean_json_response(full_content)
         email_json = json.loads(clean_string)
 
         # Add trace_id to the response
@@ -155,23 +168,20 @@ def stream_output_reducer(chunks):
 
 
 @mlflow.trace(output_reducer=stream_output_reducer)
-async def stream_generate_email_logic(
-    customer_data: dict, prompt_template: str, model: str
-):
+async def stream_generate_email_logic(customer_data: dict):
     """Stream email generation token by token"""
-    if not openai_client:
-        yield {"type": "error", "error": "OpenAI client not available"}
+    try:
+        _validate_openai_client()
+    except RuntimeError as e:
+        yield {"type": "error", "error": str(e)}
         return
 
     set_app_version()
-    #  try:
+
     # Create streaming response
     response = openai_client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": prompt_template},
-            {"role": "user", "content": json.dumps(customer_data)},
-        ],
+        model=LLM_MODEL,
+        messages=_create_messages(customer_data),
         stream=True,  # Enable streaming
     )
 
@@ -191,14 +201,7 @@ async def stream_generate_email_logic(
 
     # Parse the complete response to extract structured data
     try:
-        # Clean JSON
-        clean_string = full_response
-        if full_response.startswith("```json\n") and full_response.endswith("\n```"):
-            clean_string = full_response[len("```json\n") : -len("\n```")]
-        elif full_response.startswith("```") and full_response.endswith("```"):
-            clean_string = full_response[3:-3]
-
-        clean_string = clean_string.strip()
+        clean_string = _clean_json_response(full_response)
         email_json = json.loads(clean_string)
 
         user_instructions = customer_data.get("user_input")
@@ -213,24 +216,14 @@ async def stream_generate_email_logic(
             response_preview=email_json["body"],
         )
 
-        # Get trace_id from the current active span
-        active_span = mlflow.get_current_active_span()
-        trace_id = active_span.trace_id if active_span else None
-
         # Send completion with trace_id
-        yield {"type": "done", "trace_id": trace_id}
-
-        # Log the email to MLflow
-        # mlflow.log_text(full_response, "generated_email.json")
+        yield {"type": "done", "trace_id": _get_current_trace_id()}
 
     except json.JSONDecodeError as e:
         yield {
             "type": "error",
             "error": f"Failed to parse email JSON: {str(e)}",
         }
-
-    #  except Exception as e:
-    #      yield {"type": "error", "error": str(e)}
 
 
 def set_app_version():

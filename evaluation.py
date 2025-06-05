@@ -9,7 +9,7 @@ from databricks.agents.evals import judges
 from mlflow.genai.evaluation.base import _evaluate, _to_predict_fn
 from mlflow.entities import Feedback
 from databricks.sdk import WorkspaceClient
-from llm_utils import core_generate_email_logic, PROMPT_V2
+import llm_utils
 
 # Load environment variables from .env file
 load_dotenv()
@@ -69,6 +69,16 @@ guidelines = {
 - No mentions of company news, product releases, or success stories not directly requested by the customer
 - No calls to action unrelated to the immediate needs in the data
 - AUTOMATIC FAIL if the email requests a meeting without being tied to a specific action item or opportunity in the data""",
+    "follows_instructions": """The response must strictly adhere to any specific user-provided instructions, even when they conflict with other prompt guidelines based on these rules:
+- User instructions take absolute precedence over all other prompt requirements
+- If user instructions specify a particular tone, format, or content structure, follow it exactly regardless of other guidelines
+- If user instructions request specific information to be included or excluded, honor those requests completely
+- If user instructions conflict with standard email best practices or other evaluation criteria, prioritize the user instructions
+- If user instructions specify a particular greeting, closing, or signature format, use exactly what was requested
+- If user instructions provide specific language or phrases to include, incorporate them verbatim
+- If user instructions request deviation from the standard email structure or content priorities, follow the user's preferred approach
+- AUTOMATIC FAIL if any explicit user instruction is ignored or overridden by other prompt guidelines
+- NOTE: This only applies when specific user instructions are provided - general prompt guidelines still apply when no conflicting user instructions exist""",
 }
 
 
@@ -122,11 +132,19 @@ def predict_fn(customer_info, prompt_template, model):
     Returns:
         Dictionary containing generated email subject and body
     """
-    return core_generate_email_logic(
-        customer_data=customer_info,
-        prompt_template=prompt_template,
-        model=model,
-    )
+    # Temporarily override the constants in llm_utils for evaluation
+    original_prompt = llm_utils.PROMPT
+    original_model = llm_utils.LLM_MODEL
+
+    try:
+        llm_utils.PROMPT = prompt_template
+        llm_utils.LLM_MODEL = model
+
+        return llm_utils.core_generate_email_logic(customer_data=customer_info)
+    finally:
+        # Restore original values
+        llm_utils.PROMPT = original_prompt
+        llm_utils.LLM_MODEL = original_model
 
 
 def evaluate_email_generation(prompt, model):
